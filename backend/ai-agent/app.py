@@ -83,7 +83,7 @@ class NextQuestionResponse(BaseModel):
 
 # Initialize OpenAI models
 embeddings = OpenAIEmbeddings()
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
 
 # ==================== Helper Functions ====================
 
@@ -280,16 +280,29 @@ async def parse_resume(request: ParseResumeRequest):
         Parsed resume profile with candidate information
     """
     try:
+        print(f"[DEBUG] Received resume parse request for user: {request.userId}")
+        print(f"[DEBUG] Resume path: {request.resumePath}")
+        
         # Check if file exists
         if not os.path.exists(request.resumePath):
+            print(f"[ERROR] File not found: {request.resumePath}")
             raise HTTPException(status_code=404, detail=f"Resume file not found: {request.resumePath}")
+        
+        print(f"[DEBUG] File exists, starting parse...")
         
         # Parse resume
         resume_profile = parse_resume_from_pdf(request.resumePath)
         
+        print(f"[DEBUG] Resume parsed successfully")
+        
         return ParseResumeResponse(resumeProfile=resume_profile)
         
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        print(f"[ERROR] Exception occurred while parsing resume:")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error parsing resume: {str(e)}")
 
 

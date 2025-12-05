@@ -151,12 +151,15 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         "currentAnswer": payload.answer
     }
 
-    # Call AI Agent (mock fallback for now)
+    # Call AI Agent
     try:
         ai_response = await post_to_agent(AI_NEXT_QUESTION, ai_payload)
         next_question = ai_response.get("nextQuestion")
-    except Exception:
-        next_question = "(Mock) What is one challenge you faced in a past project and how did you overcome it?"
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI Agent Error: {str(e)}. Make sure AI Agent is running on port 5000."
+        )
 
     # If no question is returned → interview finished
     if not next_question:

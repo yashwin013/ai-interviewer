@@ -41,24 +41,30 @@ async def upload_resume(userId: str, resume: UploadFile = File(...)):
     with open(save_path, "wb") as f:
         f.write(await resume.read())
 
+    # Convert to absolute path for AI Agent
+    absolute_path = os.path.abspath(save_path)
+
     # Build payload for AI Agent
     payload = {
         "userId": userId,
-        "resumePath": save_path
+        "resumePath": absolute_path
     }
 
     # Try contacting AI Agent
     try:
         agent_response = await post_to_agent(AI_PARSE_RESUME, payload)
         parsed_resume = agent_response.get("resumeProfile")
-    except Exception:
-        # FALLBACK TEMPORARY PARSER — remove once AI Agent is ready
-        parsed_resume = {
-            "name": user.get("name", "Unknown"),
-            "skills": ["Python", "FastAPI", "MongoDB"],
-            "experience": "Demo experience (AI Agent unavailable)",
-            "education": "Demo education"
-        }
+        
+        if not parsed_resume:
+            raise HTTPException(status_code=500, detail="AI Agent did not return resume profile")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"AI Agent Error: {str(e)}. Make sure AI Agent is running on port 5000."
+        )
 
     # Update user's resumeProfile
     await db.users.update_one(

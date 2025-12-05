@@ -11,4 +11,6 @@ multipart
 faiss-cpu
 python-dotenv
 openai
-
+motor
+httpx
+uvicorn[standard]

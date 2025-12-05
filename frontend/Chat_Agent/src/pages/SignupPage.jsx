@@ -5,8 +5,9 @@ import { signupRequest } from "../redux/auth/signupSlice";
 
 const SignupPage = ({ onSignup }) => {
     const dispatch = useDispatch();
-const { loading, success, error } = useSelector((state) => state.signup);
+    const { loading, success, error: apiError } = useSelector((state) => state.signup);
     const navigate = useNavigate();
+    const [error, setError] = useState("");
     const [form, setForm] = useState({
         name: "",
         email: "",
@@ -33,15 +34,22 @@ const { loading, success, error } = useSelector((state) => state.signup);
   const msg = validate();
   if (msg) return setError(msg);
 
-//   setError("");
+  setError("");
 
   dispatch(signupRequest(form));
 };
+
 useEffect(() => {
   if (success) {
-    navigate("/login");
+    navigate("/");
   }
-}, [success]);
+}, [success, navigate]);
+
+useEffect(() => {
+  if (apiError) {
+    setError(apiError);
+  }
+}, [apiError]);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
