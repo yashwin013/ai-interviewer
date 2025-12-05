@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+pypdf
+pydantic
+pydantic-settings
+python-multipart
+faiss-cpu
+python-dotenv
+openai
