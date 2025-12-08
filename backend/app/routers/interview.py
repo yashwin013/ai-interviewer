@@ -3,127 +3,123 @@ from bson import ObjectId
 from datetime import datetime
 
 from app.db.mongo_clients import db
-from app.services.ai_agent_client import post_to_agent
+from app.services.ai_agent_client import ask_first_question, ask_next_question
 
-from app.constants.endpoints import AI_INIT_INTERVIEW, AI_NEXT_QUESTION
-from app.schemas.interview_schema import StartInterviewRequest, AnswerRequest, AnswerResponse
+from app.schemas.interview_schema import (
+    StartInterviewRequest,
+    StartInterviewResponse,
+    InitInterviewResponse,
+    AnswerRequest,
+    AnswerResponse
+)
 
 router = APIRouter(tags=["Interview"])
 
-
-# 1. START INTERVIEW
-@router.post("/start")
+@router.post("/start", response_model=StartInterviewResponse)
 async def start_interview(payload: StartInterviewRequest):
 
     # Validate userId
     try:
         user_obj_id = ObjectId(payload.userId)
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid user ID format")
 
+    # User must exist
     user = await db.users.find_one({"_id": user_obj_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Ensure resume exists
+    # Resume must be uploaded before starting interview
     if not user.get("resumeProfile"):
         raise HTTPException(
             status_code=400,
-            detail="Please upload your resume before starting the interview."
+            detail="Resume not uploaded. Please upload your resume first."
         )
 
-    # Create interview session
+    # Create new interview session
     session_doc = {
         "userId": payload.userId,
-        "resumeProfile": user["resumeProfile"],
+        "resumeProfile": user["resumeProfile"],  # contains extracted_text + chunks
         "status": "initiated",
         "createdAt": datetime.utcnow()
     }
 
     result = await db.interview_sessions.insert_one(session_doc)
 
-    return {
-        "sessionId": str(result.inserted_id),
-        "message": "Interview session created successfully."
-    }
+    return StartInterviewResponse(
+        sessionId=str(result.inserted_id),
+        message="Interview session created successfully."
+    )
 
 
-# 2. INIT INTERVIEW (First question)
-@router.post("/init/{sessionId}")
+@router.post("/init/{sessionId}", response_model=InitInterviewResponse)
 async def init_interview(sessionId: str):
 
+    # Validate session ID
     try:
         session_obj_id = ObjectId(sessionId)
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid session ID format")
 
+    # Ensure session exists
     session = await db.interview_sessions.find_one({"_id": session_obj_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    if session.get("resumeProfile") is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Resume profile missing in this session."
-        )
+    resume_profile = session.get("resumeProfile")
+    if not resume_profile:
+        raise HTTPException(status_code=400, detail="Resume profile missing.")
 
-    payload = {
+    # Build payload for AI Agent
+    ai_payload = {
         "sessionId": sessionId,
-        "resumeProfile": session["resumeProfile"]
+        "resumeText": resume_profile.get("extracted_text"),
+        "chunks": resume_profile.get("chunks")
     }
 
+    # Request first question
     try:
-        ai_response = await post_to_agent(AI_INIT_INTERVIEW, payload)
+        ai_response = await ask_first_question(ai_payload)
+        first_question = ai_response.get("question")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Agent Error: {str(e)}")
 
-    first_question = ai_response.get("question")
-
     if not first_question:
-        raise HTTPException(status_code=500, detail="AI did not generate a question")
+        raise HTTPException(status_code=500, detail="AI did not return a question")
 
-    # Store first question
-    answer_doc = {
+    # Save first question to DB
+    await db.interview_answers.insert_one({
         "sessionId": sessionId,
         "questionNumber": 1,
         "question": first_question,
         "answer": None,
         "createdAt": datetime.utcnow()
-    }
+    })
 
-    await db.interview_answers.insert_one(answer_doc)
+    return InitInterviewResponse(
+        firstQuestion=first_question,
+        message="Interview initialized."
+    )
 
-    return {
-        "message": "Interview initialized",
-        "firstQuestion": first_question
-    }
-
-# 3. SUBMIT ANSWER → GET NEXT QUESTION
 @router.post("/answer/{sessionId}", response_model=AnswerResponse)
 async def submit_answer(sessionId: str, payload: AnswerRequest):
-    """
-    1. Save user's answer for a question
-    2. Ask AI agent for the next question (or mock if unavailable)
-    3. Store the next question in DB
-    4. Return the next question
-    """
 
-    # Validate session
+    # Validate session ID
     try:
         session_obj_id = ObjectId(sessionId)
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid session ID format")
 
     session = await db.interview_sessions.find_one({"_id": session_obj_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Save answer to DB
+    resume_profile = session.get("resumeProfile")
+    if not resume_profile:
+        raise HTTPException(status_code=400, detail="Missing resume profile.")
+
     result = await db.interview_answers.update_one(
-        {
-            "sessionId": sessionId,
-            "questionNumber": payload.questionNumber
-        },
+        {"sessionId": sessionId, "questionNumber": payload.questionNumber},
         {
             "$set": {
                 "answer": payload.answer,
@@ -132,7 +128,7 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         }
     )
 
-    # If no answer doc exists yet, create it
+    # In case question doc didn't exist (edge-case)
     if result.matched_count == 0:
         await db.interview_answers.insert_one({
             "sessionId": sessionId,
@@ -143,36 +139,35 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
             "updatedAt": datetime.utcnow()
         })
 
-    # Prepare payload for AI agent
+    
     ai_payload = {
         "sessionId": sessionId,
-        "resumeProfile": session.get("resumeProfile"),
+        "resumeText": resume_profile.get("extracted_text"),
+        "chunks": resume_profile.get("chunks"),
         "currentQuestionNumber": payload.questionNumber,
         "currentAnswer": payload.answer
     }
 
-    # Call AI Agent
+    
     try:
-        ai_response = await post_to_agent(AI_NEXT_QUESTION, ai_payload)
+        ai_response = await ask_next_question(ai_payload)
         next_question = ai_response.get("nextQuestion")
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"AI Agent Error: {str(e)}. Make sure AI Agent is running on port 5000."
+            detail=f"AI Agent Error: {str(e)}"
         )
 
-    # If no question is returned → interview finished
     if not next_question:
         return AnswerResponse(
             nextQuestion=None,
             nextQuestionNumber=None,
-            message="Answer saved. No further questions."
+            message="Interview completed."
         )
 
-    # Next question number
     next_q_number = payload.questionNumber + 1
 
-    # Store next question in DB
+    # Save next question in database
     await db.interview_answers.insert_one({
         "sessionId": sessionId,
         "questionNumber": next_q_number,
@@ -181,9 +176,10 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         "createdAt": datetime.utcnow()
     })
 
-    # Return next question to frontend
-    return AnswerResponse(
+    
+    # 5. Return next question
+    return AnswerResponse(   
         nextQuestion=next_question,
         nextQuestionNumber=next_q_number,
-        message="Answer saved. Next question generated."
+        message="Next question generated."
     )

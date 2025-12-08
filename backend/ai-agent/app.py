@@ -81,9 +81,17 @@ class NextQuestionResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
-# Initialize OpenAI models
-embeddings = OpenAIEmbeddings()
-llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+# Initialize Grok (xAI) models - using OpenAI-compatible API
+# Grok API is compatible with OpenAI SDK, just need to change base_url
+llm = ChatOpenAI(
+    model="grok-2-1212",  # Grok model with structured output support
+    temperature=0.7,
+    base_url="https://api.x.ai/v1",  # Grok API endpoint
+    api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")  # Support both env vars
+)
+
+# Note: Embeddings not needed for current implementation, but keeping for future use
+embeddings = OpenAIEmbeddings() if os.getenv("OPENAI_API_KEY") else None
 
 # ==================== Helper Functions ====================
 
@@ -115,18 +123,43 @@ def parse_resume_from_pdf(pdf_path: str) -> Dict[str, Any]:
     loader = pdf.load()
     resume_text = "\n".join([page.page_content for page in loader])
     
-    # Extract structured data using LLM
-    structured_llm = llm.with_structured_output(ResumeData)
-    result = structured_llm.invoke(f"Extract the candidate's information: \n\n{resume_text}")
+    # Create prompt for JSON extraction
+    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
+
+Resume:
+{resume_text}
+
+Return a JSON object with these exact fields:
+- candidate_first_name: string
+- candidate_last_name: string
+- candidate_email: string
+- candidate_linkedin: string
+- experience: string (summary of work experience)
+- skills: array of strings
+- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
+
+Return ONLY the JSON object, no other text."""
     
-    # Convert to dictionary
+    # Use JSON mode instead of structured output
+    llm_json = ChatOpenAI(
+        model="grok-2-1212",
+        temperature=0.7,
+        base_url="https://api.x.ai/v1",
+        api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        model_kwargs={"response_format": {"type": "json_object"}}
+    )
+    
+    response = llm_json.invoke(prompt)
+    result_json = json.loads(response.content)
+    
+    # Convert to expected format
     profile = {
-        "name": f"{result.candidate_first_name} {result.candidate_last_name}",
-        "email": result.candidate_email,
-        "linkedin": result.candidate_linkedin,
-        "experience": result.experience,
-        "skills": result.skills,
-        "seniority_level": result.seniority_level
+        "name": f"{result_json['candidate_first_name']} {result_json['candidate_last_name']}",
+        "email": result_json['candidate_email'],
+        "linkedin": result_json['candidate_linkedin'],
+        "experience": result_json['experience'],
+        "skills": result_json['skills'],
+        "seniority_level": result_json['seniority_level']
     }
     
     return clean_dictionary(profile)
@@ -363,7 +396,8 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "openai_key_configured": bool(os.getenv("OPENAI_API_KEY"))
+        "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
+        "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
     }
 
 
