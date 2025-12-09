@@ -36,7 +36,6 @@ export const uploadResume = async (userId, file) => {
   return response.data;
 };
 
-// ==================== INTERVIEW APIs ====================
 
 /**
  * Start a new interview session
