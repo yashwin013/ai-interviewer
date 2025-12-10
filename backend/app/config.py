@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     
     # NEW — required for JWT authentication
     JWT_SECRET: str
+    
+    # NEW — required for Whisper API transcription
+    OPENAI_API_KEY: str
 
     # Pydantic v2 config
     model_config = {

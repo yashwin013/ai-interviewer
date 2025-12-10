@@ -1,44 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { startInterview, initInterview, submitAnswer } from "../services/apiService";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import axios from "axios";
 import Header from "./Header";
 
-// ---- Speech To Text (Browser API) ----
-const SpeechRecognition =
-  window.SpeechRecognition || window.webkitSpeechRecognition;
-
-let recognition;
-if (SpeechRecognition) {
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = "en-US";
-}
-
-// ---- Natural Voice (OpenAI Text → Speech) ----
-const speakWithOpenAI = async (text) => {
-  try {
-    const response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini-tts",
-        voice: "alloy", // natural male voice
-        input: text,
-      }),
-    });
-
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-
-    const audio = new Audio(audioUrl);
-    audio.play();
-  } catch (error) {
-    console.error("TTS Error:", error);
-  }
+// ---- Text-to-Speech (Browser API - FREE) ----
+const speakText = (text) => {
+  return new Promise((resolve) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      utterance.lang = 'en-US';
+      
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.warn('Text-to-Speech not supported');
+      resolve();
+    }
+  });
 };
 
 const InterviewPage = () => {
@@ -51,6 +38,23 @@ const InterviewPage = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const messagesEndRef = React.useRef(null);
+  
+  
+  // Audio recording state
+  const { 
+    isRecording, 
+    audioBlob, 
+    startRecording, 
+    stopRecording, 
+    resetRecording,
+    availableDevices,
+    selectedDevice,
+    setSelectedDevice
+  } = useAudioRecorder();
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = React.useRef(null);
+  const MIN_RECORDING_DURATION = 4; // seconds
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -80,14 +84,13 @@ const InterviewPage = () => {
         const initResponse = await initInterview(newSessionId);
         const firstQuestion = initResponse.firstQuestion;
 
-        // Show & Speak
         setMessages([
           { sender: "ai", text: "Hello! I'm your AI interviewer. Let's begin!" },
           { sender: "ai", text: firstQuestion },
         ]);
 
-        await speakWithOpenAI("Hello! I'm your AI interviewer. Let's begin!");
-        await speakWithOpenAI(firstQuestion);
+        await speakText("Hello! I'm your AI interviewer. Let's begin!");
+        await speakText(firstQuestion);
 
         setCurrentQuestionNumber(1);
       } catch (err) {
@@ -104,23 +107,81 @@ const InterviewPage = () => {
     initializeInterview();
   }, [navigate]);
 
-  // ---- Speech Recognition Start ----
-  const startListening = () => {
-    if (!recognition) {
-      alert("Speech Recognition not supported in this browser.");
+  // Transcribe audio using Whisper API
+  const transcribeAudio = async (audioBlob) => {
+    console.log('[TRANSCRIBE] Starting transcription...');
+    console.log('[TRANSCRIBE] Audio blob size:', audioBlob.size, 'bytes');
+    
+    setIsTranscribing(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      
+      console.log('[TRANSCRIBE] Sending to backend...');
+      
+      const response = await axios.post(
+        'http://localhost:8000/api/interview/transcribe',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      
+      console.log('[TRANSCRIBE] Response:', response.data);
+      
+      if (response.data.success) {
+        setInput(response.data.text);
+        resetRecording();
+      } else {
+        alert(response.data.error || 'No speech detected. Please try again.');
+        resetRecording();
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      alert('Failed to transcribe audio. Please try again.');
+      resetRecording();
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  // Auto-transcribe when recording stops
+  useEffect(() => {
+    if (audioBlob && !isRecording) {
+      transcribeAudio(audioBlob);
+    }
+  }, [audioBlob, isRecording]);
+
+  // Recording timer
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    }
+    
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  // Custom stop recording with minimum duration check
+  const handleStopRecording = () => {
+    if (recordingDuration < MIN_RECORDING_DURATION) {
+      alert(`Please record for at least ${MIN_RECORDING_DURATION} seconds. Current: ${recordingDuration}s`);
       return;
     }
-
-    recognition.start();
-
-    recognition.onresult = (event) => {
-      const speechText = event.results[0][0].transcript;
-      setInput(speechText);
-    };
-
-    recognition.onerror = (event) => {
-      console.log("Speech Recognition Error:", event.error);
-    };
+    stopRecording();
   };
 
   const handleSend = async () => {
@@ -145,7 +206,7 @@ const InterviewPage = () => {
           { sender: "ai", text: response.nextQuestion },
         ]);
 
-        await speakWithOpenAI(response.nextQuestion);
+        await speakText(response.nextQuestion);
         setCurrentQuestionNumber(response.nextQuestionNumber);
       } else {
         const finalMsg =
@@ -153,12 +214,8 @@ const InterviewPage = () => {
           "Thank you! The interview has been completed.";
 
         setMessages((prev) => [...prev, { sender: "ai", text: finalMsg }]);
-
-        await speakWithOpenAI(finalMsg);
-
+        await speakText(finalMsg);
         setInterviewEnded(true);
-        console.log("dxfcgvhbnm");
-        
       }
     } catch (err) {
       console.error("Submit answer error:", err);
@@ -169,7 +226,7 @@ const InterviewPage = () => {
           text: "Sorry, there was an error processing your answer. Please try again.",
         },
       ]);
-      await speakWithOpenAI(
+      await speakText(
         "Sorry, there was an error processing your answer. Please try again."
       );
     } finally {
@@ -200,7 +257,7 @@ const InterviewPage = () => {
       <div className="mt-[138px] flex-1 max-w-5xl mx-auto w-full p-4 md:p-6 flex flex-col h-[calc(100vh-138px)]">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 border border-gray-100">
           <div className="bg-[#2a164b] p-4 flex items-center justify-between shadow-md z-10">
-            <h1 className="text-white font-bold text-lg">Interview Session</h1>
+            <h1 className="text-white font-bold text-lg">Voice Interview Session</h1>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50">
             {messages.map((msg, index) => (
@@ -226,31 +283,67 @@ const InterviewPage = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
+          
+          {/* Voice-Only Input Section */}
           <div className="p-4 bg-white border-t border-gray-100">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3">
+              {/* Microphone Selector - Always show if devices available */}
+              {availableDevices.length > 0 && (
+                <div>
+                  <label className="text-sm text-gray-600 mb-1 block font-semibold">🎤 Microphone:</label>
+                  <select
+                    value={selectedDevice || ''}
+                    onChange={(e) => setSelectedDevice(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white hover:border-purple-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                    disabled={isRecording}
+                  >
+                    {availableDevices.map(device => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Microphone ${device.deviceId.substring(0, 8)}`}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Select the correct microphone if audio isn't being captured</p>
+                </div>
+              )}
+              
+              {/* Recording Button */}
               <button
-                onClick={startListening}
-                className="bg-purple-200 text-purple-800 p-4 rounded-full hover:bg-purple-300 transition shadow-md"
+                onClick={isRecording ? handleStopRecording : startRecording}
+                disabled={loading || interviewEnded || isTranscribing}
+                className={`w-full py-4 rounded-full font-semibold transition-all text-lg ${
+                  isRecording
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'bg-purple-500 text-white hover:bg-purple-600'
+                } ${(loading || interviewEnded || isTranscribing) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                🎤
+                {isRecording 
+                  ? `⏹️ Stop Recording (${recordingDuration}s${recordingDuration < MIN_RECORDING_DURATION ? ` - min ${MIN_RECORDING_DURATION}s` : ''})` 
+                  : '🎤 Start Speaking'}
               </button>
-
-              <input
-                type="text"
-                placeholder="Speak or type your answer..."
-                className="flex-1 bg-gray-50 border border-gray-200 px-6 py-4 rounded-full"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                disabled={loading || interviewEnded}
-              />
-              <button
-                onClick={handleSend}
-                disabled={loading || !input.trim()}
-                className="bg-[#00c0b3] text-white p-4 rounded-full shadow-md"
-              >
-                ➤
-              </button>
+              
+              {/* Transcription Status */}
+              {isTranscribing && (
+                <div className="text-center text-gray-600 animate-pulse py-2 font-medium">
+                  🔄 Transcribing your answer...
+                </div>
+              )}
+              
+              {/* Transcribed Text Preview */}
+              {input && !isTranscribing && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-2 font-semibold">You said:</p>
+                  <p className="text-gray-800 mb-3">{input}</p>
+                  
+                  <button
+                    onClick={handleSend}
+                    disabled={loading || !input.trim()}
+                    className="w-full bg-[#00c0b3] text-white py-3 rounded-lg font-semibold hover:bg-[#00a89d] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✓ Submit Answer
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
