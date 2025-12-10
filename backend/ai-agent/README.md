@@ -33,7 +33,8 @@ uvicorn app:app --reload --port 5000
 POST /parse-resume
 Body: {
   "userId": "user123",
-  "resumePath": "/path/to/resume.pdf"
+  "resumeText": "full resume text...",
+  "chunks": ["chunk1", "chunk2", ...]
 }
 Response: {
   "resumeProfile": {
@@ -51,7 +52,8 @@ Response: {
 POST /init-interview
 Body: {
   "sessionId": "session123",
-  "resumeProfile": { ... }
+  "resumeText": "full resume text...",
+  "chunks": ["chunk1", "chunk2", ...]
 }
 Response: {
   "question": "Tell me about yourself."
@@ -63,7 +65,8 @@ Response: {
 POST /next-question
 Body: {
   "sessionId": "session123",
-  "resumeProfile": { ... },
+  "resumeText": "full resume text...",
+  "chunks": ["chunk1", "chunk2", ...],
   "currentQuestionNumber": 1,
   "currentAnswer": "I am a software engineer..."
 }

@@ -14,7 +14,11 @@ import json
 import tempfile
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+<<<<<<< HEAD
 # New imports added on 8th December(Mainly for vectorstore). May or may not be used.
+=======
+# New imports added on 8th December(Mainly for vectorstore)
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
 #from qdrant_client import QdrantClient
 from langchain_community.vectorstores import Qdrant
 
@@ -113,6 +117,10 @@ class Orchestrator:
 
         YOUR PRIMARY GOAL:
         - Conduct an interview of exactly {max_questions} questions.
+<<<<<<< HEAD
+=======
+        
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
         - The difficulty of questions MUST match the seniority level:
             - Fresher: simple, conceptual, basics
             - Junior: basic practical + scenario
@@ -464,7 +472,11 @@ class Orchestrator:
                 tmpfile = tmp.name
             recognizer = sr.Recognizer() # Speech Recognizer's instance
             with sr.AudioFile(tmpfile) as source:
+<<<<<<< HEAD
                 audio = recognizer.record(source) # This will return a 'AudioSource' data file. May be passed to frontend, etc.
+=======
+                audio = recognizer.record(source)
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
                 text = recognizer.recognize_google(audio) # This will actually convert the audio back into text
             os.remove(tmpfile)
             print("📝 Transcribed:", text)
