@@ -69,3 +69,5 @@ node_modules/
 
 # FastAPI swagger cache
 openapi.json
+
+
