@@ -14,7 +14,7 @@ import json
 import tempfile
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-# New imports added on 8th December(Mainly for vectorstore)
+# New imports added on 8th December(Mainly for vectorstore). May or may not be used.
 #from qdrant_client import QdrantClient
 from langchain_community.vectorstores import Qdrant
 
@@ -464,7 +464,7 @@ class Orchestrator:
                 tmpfile = tmp.name
             recognizer = sr.Recognizer() # Speech Recognizer's instance
             with sr.AudioFile(tmpfile) as source:
-                audio = recognizer.record(source)
+                audio = recognizer.record(source) # This will return a 'AudioSource' data file. May be passed to frontend, etc.
                 text = recognizer.recognize_google(audio) # This will actually convert the audio back into text
             os.remove(tmpfile)
             print("📝 Transcribed:", text)
