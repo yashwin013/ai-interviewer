@@ -16,7 +16,7 @@ f1 = {
     "file_path": "C:\\Users\\Yashwin\\Documents\\Projects\\AI-Powered Mock Interviewer\\backend\\uploads\\resumes\\e288368d-94f8-456b-bc62-21b3e82c97b8.pdf"
   }
     }
-
+# Readable pdf => check
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from typing import Optional
