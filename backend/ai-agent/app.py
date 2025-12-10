@@ -12,12 +12,12 @@ import json
 from dotenv import load_dotenv
 
 # LangChain imports
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_core.documents import Document
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+
+# Session manager
+from session_manager import session_manager
 
 # Load environment variables
 load_dotenv()
@@ -52,7 +52,8 @@ class ResumeData(BaseModel):
 
 class ParseResumeRequest(BaseModel):
     userId: str
-    resumePath: str
+    resumeText: str
+    chunks: List[str]
 
 
 class ParseResumeResponse(BaseModel):
@@ -61,7 +62,8 @@ class ParseResumeResponse(BaseModel):
 
 class InitInterviewRequest(BaseModel):
     sessionId: str
-    resumeProfile: Dict[str, Any]
+    resumeText: str
+    chunks: List[str]
 
 
 class InitInterviewResponse(BaseModel):
@@ -70,7 +72,8 @@ class InitInterviewResponse(BaseModel):
 
 class NextQuestionRequest(BaseModel):
     sessionId: str
-    resumeProfile: Dict[str, Any]
+    resumeText: str
+    chunks: List[str]
     currentQuestionNumber: int
     currentAnswer: str
 
@@ -81,6 +84,7 @@ class NextQuestionResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
+<<<<<<< HEAD
 # Initialize Grok (xAI) models - using OpenAI-compatible API
 # Grok API is compatible with OpenAI SDK, just need to change base_url
 llm = ChatOpenAI(
@@ -92,6 +96,14 @@ llm = ChatOpenAI(
 
 # Note: Embeddings not needed for current implementation, but keeping for future use
 embeddings = OpenAIEmbeddings() if os.getenv("OPENAI_API_KEY") else None
+=======
+# Initialize OpenAI models
+llm = ChatOpenAI(
+    model="gpt-4o",  # OpenAI GPT-4o model with structured output support
+    temperature=0.7,
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
 
 # ==================== Helper Functions ====================
 
@@ -108,21 +120,36 @@ def clean_dictionary(data):
     return clean_data
 
 
-def parse_resume_from_pdf(pdf_path: str) -> Dict[str, Any]:
+def parse_resume_from_chunks(resume_text: str, chunks: List[str]) -> Dict[str, Any]:
     """
-    Parse resume PDF and extract candidate information using LLM.
+    Parse resume from text chunks and extract candidate information using LLM.
     
     Args:
-        pdf_path: Path to the PDF resume file
+        resume_text: Full extracted resume text
+        chunks: List of text chunks from the resume
         
     Returns:
         Dictionary with candidate information
     """
-    # Load PDF
-    pdf = PyPDFLoader(pdf_path)
-    loader = pdf.load()
-    resume_text = "\n".join([page.page_content for page in loader])
+    # Use the full resume text for extraction (chunks are for context later)
+    # Create prompt for JSON extraction
+    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
+
+Resume:
+{resume_text}
+
+Return a JSON object with these exact fields:
+- candidate_first_name: string
+- candidate_last_name: string
+- candidate_email: string
+- candidate_linkedin: string
+- experience: string (summary of work experience)
+- skills: array of strings
+- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
+
+Return ONLY the JSON object, no other text."""
     
+<<<<<<< HEAD
     # Create prompt for JSON extraction
     prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
 
@@ -149,6 +176,16 @@ Return ONLY the JSON object, no other text."""
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
+=======
+    # Use JSON mode for structured output
+    llm_json = ChatOpenAI(
+        model="gpt-4o",
+        temperature=0.7,
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model_kwargs={"response_format": {"type": "json_object"}}
+    )
+    
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     response = llm_json.invoke(prompt)
     result_json = json.loads(response.content)
     
@@ -185,6 +222,9 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     2. Skill-based
     3. Behavioral/Profile-based
 
+    RESUME CONTEXT (use this to ask relevant questions):
+    {resume_chunks}
+
     RULE:
     - If total_questions_asked == 0, you MUST ask an introductory question:
         Examples:
@@ -204,39 +244,37 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     Generate ONLY the next question.
     Avoid repeating previous questions.
     Make each new question cover a *new area* if possible.
+    Use the resume context to ask specific, relevant questions about the candidate's experience and skills.
     """)
 ])
 
 
-def generate_first_question(resume_profile: Dict[str, Any]) -> str:
+def generate_first_question(session_id: str, chunks: List[str], seniority_level: str, max_questions: int) -> str:
     """
-    Generate the first interview question based on candidate profile.
+    Generate the first interview question based on candidate profile and resume chunks.
     
     Args:
-        resume_profile: Dictionary containing candidate information
+        session_id: Session identifier
+        chunks: Resume text chunks for context
+        seniority_level: Candidate's seniority level
+        max_questions: Maximum number of questions for this interview
         
     Returns:
         First interview question as string
     """
-    seniority = resume_profile.get('seniority_level', 'Junior').lower()
-    
-    # Determine max questions based on seniority
-    if seniority == "fresher":
-        max_questions = 5
-    elif seniority == "junior":
-        max_questions = 7
-    else:
-        max_questions = 10
-    
     # Create interview chain
     interview_chain = interviewer_prompt | llm | StrOutputParser()
     
+    # Prepare resume chunks as context (first 3-5 chunks for initial question)
+    resume_context = "\n\n".join(chunks[:5])
+    
     # Generate first question
     context = {
-        "seniority_level": resume_profile.get('seniority_level', 'Junior'),
+        "seniority_level": seniority_level,
         "max_questions": max_questions,
         "total_questions_asked": 0,
-        "chat_history": ""
+        "chat_history": "",
+        "resume_chunks": resume_context
     }
     
     question = interview_chain.invoke(context)
@@ -244,46 +282,45 @@ def generate_first_question(resume_profile: Dict[str, Any]) -> str:
 
 
 def generate_next_question(
-    resume_profile: Dict[str, Any],
-    current_question_number: int,
-    current_answer: str,
-    chat_history: str = ""
+    session_id: str,
+    chunks: List[str],
+    seniority_level: str,
+    max_questions: int,
+    questions_asked: int,
+    chat_history: str
 ) -> Optional[str]:
     """
-    Generate the next interview question based on previous Q&A.
+    Generate the next interview question based on previous Q&A and resume chunks.
     
     Args:
-        resume_profile: Dictionary containing candidate information
-        current_question_number: Number of the question just answered
-        current_answer: Candidate's answer to the current question
+        session_id: Session identifier
+        chunks: Resume text chunks for context
+        seniority_level: Candidate's seniority level
+        max_questions: Maximum questions for this interview
+        questions_asked: Number of questions already asked
         chat_history: Full transcript of previous Q&A
         
     Returns:
         Next question or None if interview should end
     """
-    seniority = resume_profile.get('seniority_level', 'Junior').lower()
-    
-    # Determine max questions
-    if seniority == "fresher":
-        max_questions = 5
-    elif seniority == "junior":
-        max_questions = 7
-    else:
-        max_questions = 10
-    
     # Check if interview should end
-    if current_question_number >= max_questions:
+    if questions_asked >= max_questions:
         return None
     
     # Create interview chain
     interview_chain = interviewer_prompt | llm | StrOutputParser()
     
+    # Select relevant chunks based on conversation (simple approach: use all chunks)
+    # In a more advanced version, you could use semantic search here
+    resume_context = "\n\n".join(chunks)
+    
     # Generate next question
     context = {
-        "seniority_level": resume_profile.get('seniority_level', 'Junior'),
+        "seniority_level": seniority_level,
         "max_questions": max_questions,
-        "total_questions_asked": current_question_number,
-        "chat_history": chat_history
+        "total_questions_asked": questions_asked,
+        "chat_history": chat_history,
+        "resume_chunks": resume_context
     }
     
     question = interview_chain.invoke(context)
@@ -304,34 +341,27 @@ async def root():
 @app.post("/parse-resume", response_model=ParseResumeResponse)
 async def parse_resume(request: ParseResumeRequest):
     """
-    Parse a resume PDF and extract candidate information.
+    Parse resume from text chunks and extract candidate information.
     
     Args:
-        request: Contains userId and resumePath
+        request: Contains userId, resumeText, and chunks
         
     Returns:
         Parsed resume profile with candidate information
     """
     try:
         print(f"[DEBUG] Received resume parse request for user: {request.userId}")
-        print(f"[DEBUG] Resume path: {request.resumePath}")
+        print(f"[DEBUG] Resume text length: {len(request.resumeText)} characters")
+        print(f"[DEBUG] Number of chunks: {len(request.chunks)}")
         
-        # Check if file exists
-        if not os.path.exists(request.resumePath):
-            print(f"[ERROR] File not found: {request.resumePath}")
-            raise HTTPException(status_code=404, detail=f"Resume file not found: {request.resumePath}")
-        
-        print(f"[DEBUG] File exists, starting parse...")
-        
-        # Parse resume
-        resume_profile = parse_resume_from_pdf(request.resumePath)
+        # Parse resume from chunks
+        resume_profile = parse_resume_from_chunks(request.resumeText, request.chunks)
         
         print(f"[DEBUG] Resume parsed successfully")
+        print(f"[DEBUG] Extracted profile: {resume_profile}")
         
         return ParseResumeResponse(resumeProfile=resume_profile)
         
-    except HTTPException:
-        raise
     except Exception as e:
         import traceback
         print(f"[ERROR] Exception occurred while parsing resume:")
@@ -345,18 +375,60 @@ async def init_interview(request: InitInterviewRequest):
     Initialize an interview session and generate the first question.
     
     Args:
-        request: Contains sessionId and resumeProfile
+        request: Contains sessionId, resumeText, and chunks
         
     Returns:
         First interview question
     """
     try:
+        print(f"[DEBUG] Initializing interview for session: {request.sessionId}")
+        print(f"[DEBUG] Resume text length: {len(request.resumeText)}")
+        print(f"[DEBUG] Number of chunks: {len(request.chunks)}")
+        
+        # Parse resume to get profile
+        resume_profile = parse_resume_from_chunks(request.resumeText, request.chunks)
+        
+        # Determine max questions based on seniority
+        seniority = resume_profile.get('seniority_level', 'Junior').lower()
+        if seniority == "fresher":
+            max_questions = 5
+        elif seniority == "junior":
+            max_questions = 7
+        else:
+            max_questions = 10
+        
+        # Create session in session manager
+        session_manager.create_session(
+            session_id=request.sessionId,
+            resume_profile=resume_profile,
+            chunks=request.chunks
+        )
+        
+        print(f"[DEBUG] Session created with max_questions: {max_questions}")
+        
         # Generate first question
-        first_question = generate_first_question(request.resumeProfile)
+        first_question = generate_first_question(
+            session_id=request.sessionId,
+            chunks=request.chunks,
+            seniority_level=resume_profile['seniority_level'],
+            max_questions=max_questions
+        )
+        
+        # Store first question in session
+        session_manager.update_conversation(
+            session_id=request.sessionId,
+            question=first_question,
+            answer=None
+        )
+        
+        print(f"[DEBUG] First question generated: {first_question}")
         
         return InitInterviewResponse(question=first_question)
         
     except Exception as e:
+        import traceback
+        print(f"[ERROR] Exception occurred while initializing interview:")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error initializing interview: {str(e)}")
 
 
@@ -366,26 +438,77 @@ async def next_question(request: NextQuestionRequest):
     Generate the next interview question based on the candidate's answer.
     
     Args:
-        request: Contains sessionId, resumeProfile, currentQuestionNumber, currentAnswer
+        request: Contains sessionId, resumeText, chunks, currentQuestionNumber, currentAnswer
         
     Returns:
         Next question or null if interview is complete
     """
     try:
-        # Build chat history (simplified - in production, retrieve from database)
-        chat_history = f"Question {request.currentQuestionNumber}: [Previous question]\nAnswer: {request.currentAnswer}\n"
+        print(f"[DEBUG] Generating next question for session: {request.sessionId}")
+        print(f"[DEBUG] Current question number: {request.currentQuestionNumber}")
+        print(f"[DEBUG] Current answer: {request.currentAnswer[:100]}...")
+        
+        # Get session data
+        session = session_manager.get_session(request.sessionId)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Update conversation with the answer to current question
+        conversation = session_manager.get_conversation_history(request.sessionId)
+        if conversation and len(conversation) > 0:
+            # Update the last question with the answer
+            last_qa = conversation[-1]
+            if last_qa.get("answer") is None:
+                session_manager.update_conversation(
+                    session_id=request.sessionId,
+                    question=last_qa["question"],
+                    answer=request.currentAnswer
+                )
+        
+        # Get updated session data
+        questions_asked = session_manager.get_questions_asked(request.sessionId)
+        max_questions = session_manager.get_max_questions(request.sessionId)
+        resume_profile = session_manager.get_resume_profile(request.sessionId)
+        chunks = session_manager.get_chunks(request.sessionId)
+        
+        print(f"[DEBUG] Questions asked: {questions_asked}/{max_questions}")
+        
+        # Build chat history for context
+        conversation = session_manager.get_conversation_history(request.sessionId)
+        chat_history = "\n\n".join([
+            f"Q: {qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
+            for qa in conversation
+        ])
         
         # Generate next question
         next_q = generate_next_question(
-            resume_profile=request.resumeProfile,
-            current_question_number=request.currentQuestionNumber,
-            current_answer=request.currentAnswer,
+            session_id=request.sessionId,
+            chunks=chunks,
+            seniority_level=resume_profile['seniority_level'],
+            max_questions=max_questions,
+            questions_asked=questions_asked,
             chat_history=chat_history
         )
         
+        if next_q:
+            # Store next question in session
+            session_manager.update_conversation(
+                session_id=request.sessionId,
+                question=next_q,
+                answer=None
+            )
+            print(f"[DEBUG] Next question generated: {next_q}")
+        else:
+            print(f"[DEBUG] Interview completed - max questions reached")
+        
         return NextQuestionResponse(nextQuestion=next_q)
         
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        print(f"[ERROR] Exception occurred while generating next question:")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating next question: {str(e)}")
 
 
@@ -396,8 +519,13 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
+<<<<<<< HEAD
         "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
         "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
+=======
+        "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "api_provider": "OpenAI"
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     }
 
 
@@ -405,3 +533,5 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 5000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+

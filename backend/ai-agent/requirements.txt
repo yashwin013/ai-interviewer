@@ -16,3 +16,9 @@ httpx
 uvicorn[standard]
 PyJWT
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131

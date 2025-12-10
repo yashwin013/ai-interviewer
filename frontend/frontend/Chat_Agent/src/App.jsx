@@ -10,7 +10,6 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
 
-  // Initialize auth state from localStorage on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
