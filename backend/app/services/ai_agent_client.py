@@ -55,3 +55,8 @@ async def ask_first_question(payload: dict):
 async def ask_next_question(payload: dict):
     """Send previous answer + resume text to get next question."""
     return await call_ai_agent("next-question", payload)
+
+
+async def generate_assessment(payload: dict):
+    """Generate interview assessment after all questions answered."""
+    return await call_ai_agent("generate-assessment", payload)

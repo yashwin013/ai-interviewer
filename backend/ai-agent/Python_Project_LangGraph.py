@@ -14,12 +14,8 @@ import json
 import tempfile
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-<<<<<<< HEAD
-# New imports added on 8th December(Mainly for vectorstore). May or may not be used.
-=======
-# New imports added on 8th December(Mainly for vectorstore)
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
-#from qdrant_client import QdrantClient
+
+
 from langchain_community.vectorstores import Qdrant
 
 
@@ -34,7 +30,7 @@ try:
 except Exception as e:
     print("Warning: Some langchain-related imports failed. Ensure required packages are installed.")
     print("Import error (non-fatal now):", e)
-    # We still continue; the user should install packages if they want full LLM + embeddings functionality.
+
 
 # === Optional audio imports ===
 AUDIO_AVAILABLE = True
@@ -472,11 +468,7 @@ class Orchestrator:
                 tmpfile = tmp.name
             recognizer = sr.Recognizer() # Speech Recognizer's instance
             with sr.AudioFile(tmpfile) as source:
-<<<<<<< HEAD
                 audio = recognizer.record(source) # This will return a 'AudioSource' data file. May be passed to frontend, etc.
-=======
-                audio = recognizer.record(source)
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
                 text = recognizer.recognize_google(audio) # This will actually convert the audio back into text
             os.remove(tmpfile)
             print("📝 Transcribed:", text)
