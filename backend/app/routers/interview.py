@@ -164,17 +164,56 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
     response = await ask_next_question(payload)
     next_question = response.get("nextQuestion")
 
-    # 3. If no next question, mark interview as completed
+    # 3. If no next question, mark interview as completed and generate assessment
     if not next_question:
+        # Get all Q&A pairs for assessment
+        all_qa_pairs = await db.interview_answers.find(
+            {"sessionId": sessionId}
+        ).sort("questionNumber", 1).to_list(length=None)
+        
+        # Build transcript for assessment
+        transcript = [
+            {"question": qa.get("question", ""), "answer": qa.get("answer", "")}
+            for qa in all_qa_pairs if qa.get("answer")
+        ]
+        
+        print(f"[ASSESSMENT] Generating assessment for {len(transcript)} Q&A pairs")
+        
+        # Call AI agent for assessment
+        assessment_payload = {
+            "sessionId": sessionId,
+            "resumeText": resume_text,
+            "chunks": chunks,
+            "transcript": transcript,
+            "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior")
+        }
+        
+        try:
+            from app.services.ai_agent_client import generate_assessment
+            assessment_response = await generate_assessment(assessment_payload)
+            assessment_data = assessment_response.get("assessment", {})
+            print(f"[ASSESSMENT] Generated successfully: {assessment_data.get('candidate_score_percent')}/100")
+        except Exception as e:
+            print(f"[ASSESSMENT ERROR] {str(e)}")
+            assessment_data = None
+        
+        # Save assessment to session
         await db.interview_sessions.update_one(
             {"_id": session_obj_id},
-            {"$set": {"status": "completed", "completedAt": datetime.utcnow()}}
+            {
+                "$set": {
+                    "status": "completed",
+                    "completedAt": datetime.utcnow(),
+                    "assessment": assessment_data
+                }
+            }
         )
-
+        
         return AnswerResponse(
             nextQuestion=None,
             nextQuestionNumber=None,
-            message="Interview completed successfully."
+            message="Interview completed successfully.",
+            assessment=assessment_data
         )
 
     # 4. Save next question in database
