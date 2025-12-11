@@ -2,6 +2,8 @@
 # Python / FastAPI backend
 # -------------------------
 
+backend/.env
+
 # Virtual environment
 venv/
 env/
