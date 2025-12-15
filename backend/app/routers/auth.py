@@ -12,22 +12,17 @@ router = APIRouter(tags=["Auth"])
 # Password hashing configuration (Argon2 is secure & recommended)
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
-
-# ---------------------------
 # Password Utility Functions
-# ---------------------------
+
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-
-# ---------------------------
 # SIGNUP ROUTE
-# ---------------------------
+
 
 @router.post("/signup", response_model=AuthResponse)
 async def signup(payload: SignupRequest):
@@ -106,3 +101,4 @@ async def login(payload: LoginRequest):
         "email": user["email"],
         "token": token
     }
+

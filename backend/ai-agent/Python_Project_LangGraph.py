@@ -113,10 +113,6 @@ class Orchestrator:
 
         YOUR PRIMARY GOAL:
         - Conduct an interview of exactly {max_questions} questions.
-<<<<<<< HEAD
-=======
-        
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
         - The difficulty of questions MUST match the seniority level:
             - Fresher: simple, conceptual, basics
             - Junior: basic practical + scenario

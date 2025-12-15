@@ -203,11 +203,30 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
             {
                 "$set": {
                     "status": "completed",
-                    "completedAt": datetime.utcnow(),
-                    "assessment": assessment_data
+                    "completedAt": datetime.utcnow()
                 }
             }
         )
+        
+        # Save results to dedicated results collection
+        if assessment_data:
+            result_doc = {
+                "userId": user_id,
+                "sessionId": sessionId,
+                "candidateName": user.get("name", ""),
+                "candidateEmail": user.get("email", ""),
+                "assessment": assessment_data,
+                "transcript": transcript,
+                "resumeProfile": {
+                    "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior"),
+                    "skills": resume_profile.get("skills", []),
+                    "experience": resume_profile.get("experience", [])
+                },
+                "createdAt": datetime.utcnow()
+            }
+            
+            result = await db.results.insert_one(result_doc)
+            print(f"[RESULTS] Saved to results collection with ID: {result.inserted_id}")
         
         return AnswerResponse(
             nextQuestion=None,
