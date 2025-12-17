@@ -83,6 +83,27 @@ class NextQuestionResponse(BaseModel):
     nextQuestion: Optional[str]
 
 
+class InterviewAssessment(BaseModel):
+    """Assessment generated after interview completion."""
+    candidate_score_percent: str = Field(description="Score out of 100")
+    hiring_recommendation: str = Field(description="'Definitely Hire!', 'Proceed with caution', or 'Dont hire'")
+    strengths: List[str] = Field(description="Candidate's strengths")
+    improvement_areas: List[str] = Field(description="Areas needing improvement")
+    next_steps: str = Field(description="Recommended next steps")
+
+
+class GenerateAssessmentRequest(BaseModel):
+    sessionId: str
+    resumeText: str
+    chunks: List[str]
+    transcript: List[Dict[str, str]]  # List of {question, answer} pairs
+    seniorityLevel: str
+
+
+class GenerateAssessmentResponse(BaseModel):
+    assessment: Dict[str, Any]
+
+
 # ==================== Global LLM Setup ====================
 
 # Initialize Grok (xAI) models - using OpenAI-compatible API
@@ -226,6 +247,38 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     Avoid repeating previous questions.
     Make each new question cover a *new area* if possible.
     Use the resume context to ask specific, relevant questions about the candidate's experience and skills.
+    """)
+])
+
+
+# ==================== Assessment Prompt ====================
+
+assessment_prompt = ChatPromptTemplate.from_messages([
+    ("system", """
+    You are an experienced Hiring Manager and Technical Assessor.
+    Analyze the complete interview transcript and the candidate profile to generate a structured assessment.
+    
+    Consider:
+    - Technical knowledge demonstrated in answers
+    - Communication skills and clarity
+    - Problem-solving approach
+    - Depth of experience
+    - Alignment with stated seniority level
+    - Overall performance across all questions
+    
+    Be fair but critical. Provide actionable feedback.
+    """),
+    ("human", """
+    CANDIDATE PROFILE:
+    {profile_doc}
+    
+    SENIORITY LEVEL: {difficulty_level}
+    
+    --- COMPLETE INTERVIEW TRANSCRIPT ---
+    {chat_history}
+    
+    Generate a comprehensive assessment following the InterviewAssessment schema.
+    Include specific examples from the transcript to support your evaluation.
     """)
 ])
 
@@ -495,13 +548,83 @@ async def next_question(request: NextQuestionRequest):
 
 # ==================== Health Check ====================
 
+
+
+@app.post("/generate-assessment", response_model=GenerateAssessmentResponse)
+async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
+    """
+    Generate interview assessment after all questions answered.
+    Returns structured assessment with ratings and recommendations.
+    """
+    try:
+        print(f"[DEBUG] Generating assessment for session: {request.sessionId}")
+        
+        # Create structured LLM for assessment
+        structured_assessor = llm.with_structured_output(InterviewAssessment)
+        
+        # Prepare profile document
+        profile_doc = {
+            "resume_text": request.resumeText[:500],  # First 500 chars for context
+            "seniority_level": request.seniorityLevel
+        }
+        
+        # Format chat history
+        chat_history = "\n\n".join([
+            f"Q{i+1}: {qa.get('question', 'N/A')}\nA{i+1}: {qa.get('answer', 'N/A')}" 
+            for i, qa in enumerate(request.transcript)
+        ])
+        
+        print(f"[DEBUG] Transcript length: {len(chat_history)} characters")
+        print(f"[DEBUG] Number of Q&A pairs: {len(request.transcript)}")
+        
+        # Prepare inputs for assessment
+        inputs = {
+            "difficulty_level": request.seniorityLevel,
+            "profile_doc": json.dumps(profile_doc, indent=2),
+            "chat_history": chat_history
+        }
+        
+        # Generate assessment
+        print("[DEBUG] Invoking assessment LLM...")
+        chain = assessment_prompt | structured_assessor
+        assessment = chain.invoke(inputs)
+        
+        # Convert Pydantic model to dict
+        assessment_dict = {
+            "candidate_score_percent": assessment.candidate_score_percent,
+            "hiring_recommendation": assessment.hiring_recommendation,
+            "strengths": assessment.strengths,
+            "improvement_areas": assessment.improvement_areas,
+            "next_steps": assessment.next_steps
+        }
+        
+        print(f"[DEBUG] Assessment generated successfully")
+        print(f"[DEBUG] Score: {assessment_dict['candidate_score_percent']}/100")
+        print(f"[DEBUG] Recommendation: {assessment_dict['hiring_recommendation']}")
+        
+        return GenerateAssessmentResponse(assessment=assessment_dict)
+    
+    except Exception as e:
+        print(f"[ERROR] Exception occurred while generating assessment:")
+        print(f"[ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error generating assessment: {str(e)}")
+
+
+# ==================== Health Check ====================
+
 @app.get("/health")
 async def health_check():
+
     """Health check endpoint."""
     return {
         "status": "healthy",
+<<<<<<< HEAD
         "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
         "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
+=======
+>>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
     }
 
 
@@ -509,5 +632,6 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 5000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 

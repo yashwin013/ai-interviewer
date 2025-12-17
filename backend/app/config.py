@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     
     # NEW — required for Whisper API transcription
     OPENAI_API_KEY: str
+    
+    # Real-time STT provider settings
+    STT_PROVIDER: str = "deepgram"  # Options: "deepgram" or "assemblyai"
+    DEEPGRAM_API_KEY: str = ""
+    ASSEMBLYAI_API_KEY: str = ""
 
     # Pydantic v2 config
     model_config = {

@@ -2,6 +2,8 @@
 # Python / FastAPI backend
 # -------------------------
 
+backend/.env
+
 # Virtual environment
 venv/
 env/
@@ -69,3 +71,5 @@ node_modules/
 
 # FastAPI swagger cache
 openapi.json
+
+
