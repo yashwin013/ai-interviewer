@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import JobBoard from "./pages/JobBoard";
 import InterviewHistory from "./pages/InterviewHistory";
+import InterviewResults from "./pages/InterviewResults";
 import Analytics from "./pages/Analytics";
 import ResumeUpload from "./pages/ResumeUpload";
 import ResumeSummary from "./pages/ResumeSummary";
@@ -92,6 +93,16 @@ function App() {
           element={
             isLoggedIn ? (
               <Analytics userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/results/:sessionId"
+          element={
+            isLoggedIn ? (
+              <InterviewResults userEmail={userData?.email} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )

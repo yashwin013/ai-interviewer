@@ -71,3 +71,61 @@ export const submitAnswer = async (sessionId, questionNumber, answer) => {
   });
   return response.data;
 };
+
+// ==================== RESULTS APIs ====================
+
+/**
+ * Get all interview results for a user
+ * @param {string} userId - User ID
+ * @returns {Promise} - Array of interview results
+ */
+export const getUserResults = async (userId) => {
+  const response = await axiosInstance.get(`/results/user/${userId}`);
+  return response.data;
+};
+
+/**
+ * Get interview result for a specific session
+ * @param {string} sessionId - Interview session ID
+ * @returns {Promise} - Interview result with assessment
+ */
+export const getSessionResult = async (sessionId) => {
+  const response = await axiosInstance.get(`/results/session/${sessionId}`);
+  return response.data;
+};
+
+// ==================== JOBS APIs ====================
+
+/**
+ * Get all jobs with pagination and filters
+ * @param {object} params - Query parameters (page, limit, location, experience_level, skills)
+ * @returns {Promise} - Jobs list with pagination
+ */
+export const getAllJobs = async (params = {}) => {
+  const response = await axiosInstance.get('/jobs', { params });
+  return response.data;
+};
+
+/**
+ * Get a specific job by ID
+ * @param {string} jobId - Job ID
+ * @returns {Promise} - Job details
+ */
+export const getJobById = async (jobId) => {
+  const response = await axiosInstance.get(`/jobs/${jobId}`);
+  return response.data;
+};
+
+/**
+ * Search jobs by keyword
+ * @param {string} query - Search query
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Promise} - Search results
+ */
+export const searchJobs = async (query, page = 1, limit = 20) => {
+  const response = await axiosInstance.get('/jobs/search/query', {
+    params: { q: query, page, limit }
+  });
+  return response.data;
+};
