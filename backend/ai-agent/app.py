@@ -565,13 +565,14 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         chain = assessment_prompt | structured_assessor
         assessment = chain.invoke(inputs)
         
-        # Convert Pydantic model to dict
+        # Convert Pydantic model to dict and map field names to match frontend
         assessment_dict = {
             "candidate_score_percent": assessment.candidate_score_percent,
             "hiring_recommendation": assessment.hiring_recommendation,
+            "summary": f"{assessment.hiring_recommendation}. The candidate demonstrated {len(assessment.strengths)} key strengths.",
             "strengths": assessment.strengths,
-            "improvement_areas": assessment.improvement_areas,
-            "next_steps": assessment.next_steps
+            "weaknesses": assessment.improvement_areas,  # Map improvement_areas to weaknesses
+            "recommendations": [assessment.next_steps] if isinstance(assessment.next_steps, str) else assessment.next_steps  # Map next_steps to recommendations
         }
         
         print(f"[DEBUG] Assessment generated successfully")
