@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import OpenAIEmbeddings
 
 # Session manager
 from session_manager import session_manager
@@ -84,7 +85,6 @@ class NextQuestionResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
-<<<<<<< HEAD
 # Initialize Grok (xAI) models - using OpenAI-compatible API
 # Grok API is compatible with OpenAI SDK, just need to change base_url
 llm = ChatOpenAI(
@@ -96,14 +96,6 @@ llm = ChatOpenAI(
 
 # Note: Embeddings not needed for current implementation, but keeping for future use
 embeddings = OpenAIEmbeddings() if os.getenv("OPENAI_API_KEY") else None
-=======
-# Initialize OpenAI models
-llm = ChatOpenAI(
-    model="gpt-4o",  # OpenAI GPT-4o model with structured output support
-    temperature=0.7,
-    api_key=os.getenv("OPENAI_API_KEY")
-)
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
 
 # ==================== Helper Functions ====================
 
@@ -149,7 +141,6 @@ Return a JSON object with these exact fields:
 
 Return ONLY the JSON object, no other text."""
     
-<<<<<<< HEAD
     # Create prompt for JSON extraction
     prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
 
@@ -176,16 +167,6 @@ Return ONLY the JSON object, no other text."""
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
-=======
-    # Use JSON mode for structured output
-    llm_json = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.7,
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model_kwargs={"response_format": {"type": "json_object"}}
-    )
-    
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     response = llm_json.invoke(prompt)
     result_json = json.loads(response.content)
     
@@ -519,13 +500,8 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-<<<<<<< HEAD
         "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
         "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
-=======
-        "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
-        "api_provider": "OpenAI"
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     }
 
 
