@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import interview, resume, auth, results, voice_interview
+from app.routers import interview, resume, auth, results, voice_interview, jobs
 
 app = FastAPI(
     title="AI Interview",
@@ -30,6 +30,9 @@ app.include_router(resume.router, prefix="/api/resume")
 
 # Results routes
 app.include_router(results.router, prefix="/api/results")
+
+# Jobs routes
+app.include_router(jobs.router, prefix="/api/jobs")
 
 @app.get("/")
 async def root():

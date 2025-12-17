@@ -24,7 +24,7 @@ class ResultResponse(BaseModel):
     candidateName: Optional[str] = None
     candidateEmail: Optional[str] = None
     assessment: Optional[AssessmentData] = None
-    createdAt: str
+    createdAt: Optional[str] = None
     
     class Config:
         json_schema_extra = {
@@ -66,16 +66,35 @@ async def get_user_results(userId: str):
     # Get all results for this user
     results = await db.results.find({"userId": userId}).sort("createdAt", -1).to_list(length=None)
     
-    # Format response
+    # Format response and map old field names to new ones
     formatted_results = []
     for result in results:
+        assessment = result.get("assessment", {})
+        
+        # Map old field names to new ones for backward compatibility
+        if assessment:
+            # If old format (improvement_areas), map to new format (weaknesses)
+            if "improvement_areas" in assessment and "weaknesses" not in assessment:
+                assessment["weaknesses"] = assessment["improvement_areas"]
+            
+            # If old format (next_steps), map to new format (recommendations)
+            if "next_steps" in assessment and "recommendations" not in assessment:
+                next_steps = assessment["next_steps"]
+                # Convert string to list if needed
+                assessment["recommendations"] = [next_steps] if isinstance(next_steps, str) else next_steps
+            
+            # Add summary if missing
+            if "summary" not in assessment and "hiring_recommendation" in assessment:
+                strengths_count = len(assessment.get("strengths", []))
+                assessment["summary"] = f"{assessment['hiring_recommendation']}. The candidate demonstrated {strengths_count} key strengths."
+        
         formatted_results.append({
             "resultId": str(result["_id"]),
             "userId": result.get("userId"),
             "sessionId": result.get("sessionId"),
             "candidateName": result.get("candidateName"),
             "candidateEmail": result.get("candidateEmail"),
-            "assessment": result.get("assessment"),
+            "assessment": assessment,
             "createdAt": result.get("createdAt").isoformat() if result.get("createdAt") else None
         })
     
@@ -97,6 +116,23 @@ async def get_session_result(sessionId: str):
             detail="No results found for this session. The interview may not be completed yet."
         )
     
+    # Map old field names to new ones for backward compatibility
+    assessment = result.get("assessment", {})
+    if assessment:
+        # If old format (improvement_areas), map to new format (weaknesses)
+        if "improvement_areas" in assessment and "weaknesses" not in assessment:
+            assessment["weaknesses"] = assessment["improvement_areas"]
+        
+        # If old format (next_steps), map to new format (recommendations)
+        if "next_steps" in assessment and "recommendations" not in assessment:
+            next_steps = assessment["next_steps"]
+            assessment["recommendations"] = [next_steps] if isinstance(next_steps, str) else next_steps
+        
+        # Add summary if missing
+        if "summary" not in assessment and "hiring_recommendation" in assessment:
+            strengths_count = len(assessment.get("strengths", []))
+            assessment["summary"] = f"{assessment['hiring_recommendation']}. The candidate demonstrated {strengths_count} key strengths."
+    
     # Format response
     return {
         "resultId": str(result["_id"]),
@@ -104,7 +140,7 @@ async def get_session_result(sessionId: str):
         "sessionId": result.get("sessionId"),
         "candidateName": result.get("candidateName"),
         "candidateEmail": result.get("candidateEmail"),
-        "assessment": result.get("assessment"),
+        "assessment": assessment,
         "createdAt": result.get("createdAt").isoformat() if result.get("createdAt") else None
     }
 
