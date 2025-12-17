@@ -383,7 +383,7 @@ Text:
 
         print("\n[generate_assessment] Invoking assessor chain...")
         try:
-            assessment_obj = chain.invoke(final_inputs)  # correct: passes dict to prompt template
+            assessment_obj = chain.invoke(final_inputs) # This will pass dict to prompt template
         except Exception as e:
             raise RuntimeError(f"Assessment generation failed: {e}")
 
@@ -461,7 +461,7 @@ Text:
 
 
 # -------------------------
-# CLI / usage example
+# Main function
 # -------------------------
 def main():
     # Basic choice: run from external JSON or a PDF file
