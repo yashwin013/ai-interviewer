@@ -14,15 +14,9 @@ import json
 import tempfile
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-<<<<<<< HEAD
 # New imports added on 8th December(Mainly for vectorstore). May or may not be used.
 #from qdrant_client import QdrantClient
-=======
-
-
->>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
 from langchain_community.vectorstores import Qdrant
-from app.services.Similarity_Jobs import Job_Matcher
 
 # === External LLM / embeddings imports ===
 try:
@@ -35,7 +29,7 @@ try:
 except Exception as e:
     print("Warning: Some langchain-related imports failed. Ensure required packages are installed.")
     print("Import error (non-fatal now):", e)
-
+    # We still continue; the user should install packages if they want full LLM + embeddings functionality.
 
 # === Optional audio imports ===
 AUDIO_AVAILABLE = True
@@ -96,7 +90,6 @@ class InterviewState(BaseModel):
     max_questions: int = 0
     assessment: Optional[Dict[str, Any]] = None
     pdf_path_out: Optional[str] = None
-    job_match: Optional[Dict[str, Any]] = None  # Injecting the job_matched status
 
 
 class Orchestrator:
@@ -111,8 +104,6 @@ class Orchestrator:
 
         # Build prompt templates used in original file (adapted)
         self._build_prompts()
-        # Job Matching
-        self.job_matching = Job_Matcher(self.embeddings) # Initializing the Job Matcher object with model's embeddings
 
     def _build_prompts(self):
         # Interviewer prompt template
@@ -280,23 +271,6 @@ class Orchestrator:
         return {"profile": profile, "vectorstore": vectorstore}
 
     # ---------------------------
-    # Node: Updating state for missing skills, matched skills, etc
-    # ---------------------------
-    def skills_updation(self, state: InterviewState, jd_text: str, jd_skills: list):
-        """
-           Run resume ↔ job matching and store results in state
-        """
-
-        result = self.job_matching.match(
-            profile = state.profile,
-            jd_text = jd_text,
-            jd_skills = jd_skills
-        )
-
-        state.job_match = result         
-        return state
-
-    # ---------------------------
     # Node: Interview loop (question generation + answers)
     # ---------------------------
     def run_interview_loop(self, state: InterviewState):
@@ -447,35 +421,6 @@ class Orchestrator:
                 story.append(Paragraph(f"• {i}", styles["Normal"]))
             story.append(Spacer(1, 0.2 * inch))
 
-            job_match = state.job_match or {}
-            missing_skills = job_match.get("Missing_Skills", [])
-            matched_skills = job_match.get("Matched_Skills", [])
-            final_score = job_match.get("Final_Score", None)
-
-            story.append(Spacer(1, 0.3 * inch))
-            story.append(Paragraph("<b>Job Match Analysis</b>", styles["Heading2"]))
-
-            if final_score is not None:
-                story.append(Paragraph(f"<b>Overall Match Score:</b> {final_score}%", styles["Normal"]))
-
-            story.append(Spacer(1, 0.15 * inch))
-
-            story.append(Paragraph("<b>Matched Skills:</b>", styles["Heading3"]))
-            if matched_skills:
-                for s in matched_skills:
-                    story.append(Paragraph(f"• {s}", styles["Normal"]))
-            else:
-                story.append(Paragraph("No matched skills identified.", styles["Normal"]))
-
-            story.append(Spacer(1, 0.15 * inch))
-
-            story.append(Paragraph("<b>Missing Skills:</b>", styles["Heading3"]))
-            if missing_skills:
-                for s in missing_skills:
-                    story.append(Paragraph(f"• {s}", styles["Normal"]))
-            else:
-                story.append(Paragraph("No missing skills 🎉", styles["Normal"]))
-
             story.append(Paragraph("<b>Suggested Next Steps:</b>", styles["Heading3"]))
             story.append(Paragraph(state.assessment.get("next_steps", ""), styles["Normal"]))
 
@@ -531,18 +476,13 @@ class Orchestrator:
     # ---------------------------
     # Full pipeline runner
     # ---------------------------
-    def run_full_pipeline(self, pdf_path: str, jd_text: str, jd_skills: list) -> InterviewState:
+    def run_full_pipeline(self, pdf_path: str) -> InterviewState:
         # 1) extract resume
         extraction = self.extract_resume(pdf_path)
         state = InterviewState(pdf_path=pdf_path) # This 'state' object will act as the central state for ahead processes to be followed
         state.profile = extraction["profile"]
         state.vectorstore = extraction.get("vectorstore")
 
-        # Match required skills on JD with Candidate's skills on JD 
-        # For now, we will hardcode the job description and job skills
-        
-        state = self.skills_updation(state, jd_text, jd_skills)
-        
         # 2) interview loop
         state = self.run_interview_loop(state)
 
@@ -581,12 +521,7 @@ def main():
 
     # Run pipeline
     try:
-        # Hardcoding the job description and job skills
-        job_description = """
-                            We are hiring a Backend Engineer with Python, FastAPI, MongoDB, and AWS.
-                          """
-        job_skills = ["python", "fastapi", "mongodb", "aws"]
-        final_state = orch.run_full_pipeline(pdf_path,job_description,job_skills)
+        final_state = orch.run_full_pipeline(pdf_path)
     except Exception as e:
         print("Pipeline failed:", e)
         return
@@ -607,4 +542,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
 

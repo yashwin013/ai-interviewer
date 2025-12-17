@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import OpenAIEmbeddings
 
 # Session manager
 from session_manager import session_manager
@@ -105,12 +106,17 @@ class GenerateAssessmentResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
-# Initialize OpenAI models
+# Initialize Grok (xAI) models - using OpenAI-compatible API
+# Grok API is compatible with OpenAI SDK, just need to change base_url
 llm = ChatOpenAI(
-    model="gpt-4o",  # OpenAI GPT-4o model with structured output support
+    model="grok-2-1212",  # Grok model with structured output support
     temperature=0.7,
-    api_key=os.getenv("OPENAI_API_KEY")
+    base_url="https://api.x.ai/v1",  # Grok API endpoint
+    api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")  # Support both env vars
 )
+
+# Note: Embeddings not needed for current implementation, but keeping for future use
+embeddings = OpenAIEmbeddings() if os.getenv("OPENAI_API_KEY") else None
 
 # ==================== Helper Functions ====================
 
@@ -156,11 +162,29 @@ Return a JSON object with these exact fields:
 
 Return ONLY the JSON object, no other text."""
     
-    # Use JSON mode for structured output
+    # Create prompt for JSON extraction
+    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
+
+Resume:
+{resume_text}
+
+Return a JSON object with these exact fields:
+- candidate_first_name: string
+- candidate_last_name: string
+- candidate_email: string
+- candidate_linkedin: string
+- experience: string (summary of work experience)
+- skills: array of strings
+- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
+
+Return ONLY the JSON object, no other text."""
+    
+    # Use JSON mode instead of structured output
     llm_json = ChatOpenAI(
-        model="gpt-4o",
+        model="grok-2-1212",
         temperature=0.7,
-        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="https://api.x.ai/v1",
+        api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
@@ -597,6 +621,11 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
+<<<<<<< HEAD
+        "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
+        "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
+=======
+>>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
     }
 
 
