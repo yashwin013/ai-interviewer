@@ -14,8 +14,13 @@ import json
 import tempfile
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+<<<<<<< HEAD
 # New imports added on 8th December(Mainly for vectorstore). May or may not be used.
 #from qdrant_client import QdrantClient
+=======
+
+
+>>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
 from langchain_community.vectorstores import Qdrant
 from app.services.Similarity_Jobs import Job_Matcher
 
@@ -30,7 +35,7 @@ try:
 except Exception as e:
     print("Warning: Some langchain-related imports failed. Ensure required packages are installed.")
     print("Import error (non-fatal now):", e)
-    # We still continue; the user should install packages if they want full LLM + embeddings functionality.
+
 
 # === Optional audio imports ===
 AUDIO_AVAILABLE = True

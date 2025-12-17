@@ -4,10 +4,50 @@ import Header from "./Header";
 import { uploadResume } from "../services/apiService";
 
 const ResumeUpload = ({ userEmail, onLogout }) => {
-  const [resumeFile, setResumeFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const navigate = useNavigate();
+  const [resumeFile, setResumeFile] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+        setResumeFile(file);
+        setError("");
+      } else {
+        setError("Please upload a PDF file only.");
+        setResumeFile(null);
+      }
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+        setResumeFile(file);
+        setError("");
+      } else {
+        setError("Please upload a PDF file only.");
+        setResumeFile(null);
+      }
+    }
+  };
 
   const handleUpload = async () => {
     if (!resumeFile) {
@@ -19,7 +59,6 @@ const ResumeUpload = ({ userEmail, onLogout }) => {
     setLoading(true);
 
     try {
-      // Get userId from localStorage
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user || !user.userId) {
         setError("User not found. Please login again.");
@@ -28,7 +67,8 @@ const ResumeUpload = ({ userEmail, onLogout }) => {
       }
       const response = await uploadResume(user.userId, resumeFile);
       navigate("/resume-summary", {
-  state: { resumeProfile: response.resumeProfile },      });
+        state: { resumeProfile: response.resumeProfile },
+      });
     } catch (err) {
       console.error("Resume upload error:", err);
       setError(
@@ -41,138 +81,158 @@ const ResumeUpload = ({ userEmail, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 font-sans">
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scale-in {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+          50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.6); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-fade-in { animation: fade-in 0.6s ease-out; }
+        .animate-scale-in { animation: scale-in 0.5s ease-out; }
+        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+      `}</style>
+
       <Header userEmail={userEmail} onLogout={onLogout} />
-      <div className="relative bg-[#9eb5b3] min-h-[600px] flex items-center justify-center overflow-hidden ">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/10 rounded-full blur-2xl"></div>
-        </div>
-
-        <div className="relative z-10 w-full max-w-4xl px-6 text-center">
-
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 drop-shadow-md">
-            Upload your resume on AI INTERVIEW
-          </h1>
-
-          <p className="text-xl md:text-2xl text-white/90 mb-12 italic font-light">
-            and let the right job find <span className="font-semibold not-italic">you!</span>
-          </p>
-
-          {/* Upload Card */}
-          <div className="bg-white p-8 rounded-xl shadow-2xl max-w-xl mx-auto transform transition-all hover:scale-105 duration-300">
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${resumeFile ? "border-green-500 bg-green-50" : "border-gray-300 hover:border-[#6e46ae]"
-                }`}
-            >
-              <input
-                type="file"
-                id="resume-upload"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => {
-                  setResumeFile(e.target.files[0]);
-                  setError("");
-                }}
-                className="hidden"
-                disabled={loading}
-              />
-              <label
-                htmlFor="resume-upload"
-                className="cursor-pointer block"
-              >
-                {resumeFile ? (
-                  <div>
-                    <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <p className="text-green-700 font-medium truncate px-4">{resumeFile.name}</p>
-                    <p className="text-xs text-green-500 mt-1">Click to change file</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="w-16 h-16 bg-[#f0f0ff] text-[#6e46ae] rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    </div>
-                    <p className="text-lg font-medium text-gray-700 mb-2">Drag and drop or click to upload</p>
-                    <p className="text-sm text-gray-400">Supported formats: PDF, DOC, DOCX</p>
-                  </div>
-                )}
-              </label>
+      
+      <div className="pt-[138px] min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full">
+          {/* Main Card */}
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-12 animate-fade-in border border-white/50">
+            
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="inline-block p-4 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl mb-4 animate-float shadow-lg">
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
+                Upload Your Resume
+              </h1>
+              <p className="text-gray-600 text-lg">
+                Let's analyze your experience and start your mock interview
+              </p>
             </div>
 
+            {/* Drag & Drop Area */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`relative border-3 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ${
+                isDragging
+                  ? 'border-purple-500 bg-purple-50/50 scale-105'
+                  : resumeFile
+                  ? 'border-green-400 bg-green-50/50'
+                  : 'border-gray-300 bg-gray-50/50 hover:border-purple-400 hover:bg-purple-50/30'
+              }`}
+            >
+              {resumeFile ? (
+                <div className="animate-scale-in">
+                  <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-xl font-semibold text-gray-800 mb-2">
+                    {resumeFile.name}
+                  </p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {(resumeFile.size / 1024).toFixed(2)} KB
+                  </p>
+                  <button
+                    onClick={() => setResumeFile(null)}
+                    className="text-red-600 hover:text-red-700 font-medium text-sm hover:underline transition"
+                  >
+                    Remove file
+                  </button>
+                </div>
+              ) : (
+                <div className="animate-fade-in">
+                  <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center">
+                    <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <p className="text-xl font-semibold text-gray-700 mb-2">
+                    Drag & drop your resume here
+                  </p>
+                  <p className="text-gray-500 mb-4">or</p>
+                  <label className="inline-block cursor-pointer">
+                    <span className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 inline-block">
+                      Browse Files
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-sm text-gray-400 mt-4">
+                    PDF files only • Max 10MB
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Error Message */}
             {error && (
-              <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-center gap-2">
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {error}
+              <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4 animate-scale-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-red-700 font-medium">{error}</p>
+                </div>
               </div>
             )}
 
+            {/* Upload Button */}
             <button
               onClick={handleUpload}
-              disabled={loading}
-              className={`mt-6 w-full py-4 text-white text-lg font-bold rounded-lg shadow-lg transition-all transform active:scale-95 ${loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#6e46ae] hover:bg-[#56368b] hover:shadow-xl"
-                }`}
+              disabled={!resumeFile || loading}
+              className={`w-full mt-8 py-5 rounded-2xl font-bold text-xl transition-all shadow-2xl ${
+                resumeFile && !loading
+                  ? 'bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white hover:from-purple-700 hover:via-blue-700 hover:to-indigo-700 transform hover:scale-105 active:scale-95 animate-pulse-glow'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <div className="flex items-center justify-center gap-3">
+                  <svg className="animate-spin h-6 w-6 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Analyzing Resume...
-                </span>
+                  <span>Analyzing Resume...</span>
+                </div>
               ) : (
-                "Upload Your Resume"
+                <div className="flex items-center justify-center gap-3">
+                  <span>Continue to Interview</span>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </div>
               )}
             </button>
           </div>
         </div>
       </div>
-      <div className="bg-white py-16 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12">
-          <div className="md:w-1/2">
-            <div className="hidden md:block w-full h-64 bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg flex items-center justify-center text-gray-400">                <img
-              src="/resume-tips.png"
-              alt="Resume Tips"
-              className="rounded-lg shadow-lg opacity-80 w-full h-64 object-cover"
-              onError={(e) => (e.target.style.display = "none")}
-            />
-            </div>
-          </div>
-
-          <div className="md:w-1/2 text-left">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">Why use AI Interview Studio?</h2>
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">✓</div>
-                <p className="text-gray-600">Get instant feedback on your resume structure and content.</p>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">✓</div>
-                <p className="text-gray-600">Practice with AI-generated questions tailored to your profile.</p>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">✓</div>
-                <p className="text-gray-600">Increase your chances of landing your dream job.</p>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <footer className="bg-[#1e0c3e] text-white/70 py-8 text-center text-sm mt-auto">
-        <div className="max-w-7xl mx-auto px-6">
-          <p>© 2025 AI Interview Studio. All rights reserved.</p>
-        </div>
-      </footer>
     </div>
   );
 };

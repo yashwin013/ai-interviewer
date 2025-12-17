@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import Dashboard from "./pages/Dashboard";
+import JobBoard from "./pages/JobBoard";
+import InterviewHistory from "./pages/InterviewHistory";
+import Analytics from "./pages/Analytics";
 import ResumeUpload from "./pages/ResumeUpload";
 import ResumeSummary from "./pages/ResumeSummary";
 import InterviewPage from "./pages/InterviewPage";
+import VoiceInterviewPage from "./pages/VoiceInterviewPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 
@@ -48,7 +53,47 @@ function App() {
             !isLoggedIn ? (
               <LoginPage onLogin={handleLogin} />
             ) : (
-              <Navigate to="/upload" replace />
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            isLoggedIn ? (
+              <Dashboard userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/jobs"
+          element={
+            isLoggedIn ? (
+              <JobBoard userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/history"
+          element={
+            isLoggedIn ? (
+              <InterviewHistory userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/analytics"
+          element={
+            isLoggedIn ? (
+              <Analytics userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
             )
           }
         />
@@ -82,6 +127,16 @@ function App() {
             )
           }
         />
+        <Route
+          path="/voice-interview"
+          element={
+            isLoggedIn ? (
+              <VoiceInterviewPage />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
         <Route
           path="/SignupPage"
@@ -95,3 +150,4 @@ function App() {
 }
 
 export default App;
+

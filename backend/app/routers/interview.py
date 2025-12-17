@@ -279,6 +279,7 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
     next_question = response.get("nextQuestion")
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     
     try:
         ai_response = await ask_next_question(ai_payload)
@@ -299,16 +300,77 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
     next_q_number = payload.questionNumber + 1
 =======
     # 3. If no next question, mark interview as completed
+=======
+    # 3. If no next question, mark interview as completed and generate assessment
+>>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
     if not next_question:
+        # Get all Q&A pairs for assessment
+        all_qa_pairs = await db.interview_answers.find(
+            {"sessionId": sessionId}
+        ).sort("questionNumber", 1).to_list(length=None)
+        
+        # Build transcript for assessment
+        transcript = [
+            {"question": qa.get("question", ""), "answer": qa.get("answer", "")}
+            for qa in all_qa_pairs if qa.get("answer")
+        ]
+        
+        print(f"[ASSESSMENT] Generating assessment for {len(transcript)} Q&A pairs")
+        
+        # Call AI agent for assessment
+        assessment_payload = {
+            "sessionId": sessionId,
+            "resumeText": resume_text,
+            "chunks": chunks,
+            "transcript": transcript,
+            "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior")
+        }
+        
+        try:
+            from app.services.ai_agent_client import generate_assessment
+            assessment_response = await generate_assessment(assessment_payload)
+            assessment_data = assessment_response.get("assessment", {})
+            print(f"[ASSESSMENT] Generated successfully: {assessment_data.get('candidate_score_percent')}/100")
+        except Exception as e:
+            print(f"[ASSESSMENT ERROR] {str(e)}")
+            assessment_data = None
+        
+        # Save assessment to session
         await db.interview_sessions.update_one(
             {"_id": session_obj_id},
-            {"$set": {"status": "completed", "completedAt": datetime.utcnow()}}
+            {
+                "$set": {
+                    "status": "completed",
+                    "completedAt": datetime.utcnow()
+                }
+            }
         )
-
+        
+        # Save results to dedicated results collection
+        if assessment_data:
+            result_doc = {
+                "userId": user_id,
+                "sessionId": sessionId,
+                "candidateName": user.get("name", ""),
+                "candidateEmail": user.get("email", ""),
+                "assessment": assessment_data,
+                "transcript": transcript,
+                "resumeProfile": {
+                    "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior"),
+                    "skills": resume_profile.get("skills", []),
+                    "experience": resume_profile.get("experience", [])
+                },
+                "createdAt": datetime.utcnow()
+            }
+            
+            result = await db.results.insert_one(result_doc)
+            print(f"[RESULTS] Saved to results collection with ID: {result.inserted_id}")
+        
         return AnswerResponse(
             nextQuestion=None,
             nextQuestionNumber=None,
-            message="Interview completed successfully."
+            message="Interview completed successfully.",
+            assessment=assessment_data
         )
 
     # 4. Save next question in database

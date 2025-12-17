@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+
 # 1. START INTERVIEW
 class StartInterviewRequest(BaseModel):
     userId: str
@@ -27,6 +28,7 @@ class AnswerResponse(BaseModel):
     nextQuestionNumber: Optional[int]   
     nextQuestion: Optional[str]         
     message: str
+    assessment: Optional[Dict[str, Any]] = None  # Added for interview completion
 
 class ResumeTextProfile(BaseModel):
     extracted_text: str
