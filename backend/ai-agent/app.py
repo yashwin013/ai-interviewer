@@ -106,13 +106,11 @@ class GenerateAssessmentResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
-# Initialize Grok (xAI) models - using OpenAI-compatible API
-# Grok API is compatible with OpenAI SDK, just need to change base_url
+# Initialize OpenAI models
 llm = ChatOpenAI(
-    model="grok-2-1212",  # Grok model with structured output support
+    model="gpt-4o",  # OpenAI GPT-4o model
     temperature=0.7,
-    base_url="https://api.x.ai/v1",  # Grok API endpoint
-    api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")  # Support both env vars
+    api_key=os.getenv("OPENAI_API_KEY")
 )
 
 # Note: Embeddings not needed for current implementation, but keeping for future use
@@ -179,12 +177,11 @@ Return a JSON object with these exact fields:
 
 Return ONLY the JSON object, no other text."""
     
-    # Use JSON mode instead of structured output
+    # Use JSON mode for structured output
     llm_json = ChatOpenAI(
-        model="grok-2-1212",
+        model="gpt-4o",
         temperature=0.7,
-        base_url="https://api.x.ai/v1",
-        api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        api_key=os.getenv("OPENAI_API_KEY"),
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
@@ -621,11 +618,8 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-<<<<<<< HEAD
-        "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
-        "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
-=======
->>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
+        "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "api_provider": "OpenAI"
     }
 
 

@@ -7,10 +7,6 @@ from openai import OpenAI
 
 from app.db.mongo_clients import db
 from app.services.ai_agent_client import ask_first_question, ask_next_question
-<<<<<<< HEAD
-=======
-from app.config import settings
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
 
 from app.schemas.interview_schema import (
     StartInterviewRequest,
@@ -32,56 +28,10 @@ async def start_interview(payload: StartInterviewRequest):
         raise HTTPException(status_code=400, detail="Invalid user ID format")
 
     # User must exist
-<<<<<<< HEAD
-=======
     user = await db.users.find_one({"_id": user_obj_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Create a new interview session
-    session_doc = {
-        "userId": payload.userId,
-        "status": "active",
-        "createdAt": datetime.utcnow(),
-        "completedAt": None
-    }
-
-    result = await db.interview_sessions.insert_one(session_doc)
-    session_id = str(result.inserted_id)
-
-    return StartInterviewResponse(
-        sessionId=session_id,
-        message="Interview session created successfully."
-    )
-
-
-@router.post("/init/{sessionId}", response_model=InitInterviewResponse)
-async def init_interview(sessionId: str):
-
-    # Validate sessionId
-    try:
-        session_obj_id = ObjectId(sessionId)
-    except:
-        raise HTTPException(status_code=400, detail="Invalid session ID format")
-
-    # Session must exist
-    session = await db.interview_sessions.find_one({"_id": session_obj_id})
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    # Get user's resume profile
-    user_id = session["userId"]
-    try:
-        user_obj_id = ObjectId(user_id)
-    except:
-        raise HTTPException(status_code=400, detail="Invalid user ID in session")
-
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
-    user = await db.users.find_one({"_id": user_obj_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-<<<<<<< HEAD
     # Resume must be uploaded before starting interview
     if not user.get("resumeProfile"):
         raise HTTPException(
@@ -128,29 +78,10 @@ async def init_interview(sessionId: str):
         "sessionId": sessionId,
         "resumeText": resume_profile.get("extracted_text"),
         "chunks": resume_profile.get("chunks")
-=======
-    resume_profile = user.get("resumeProfile")
-    if not resume_profile:
-        raise HTTPException(status_code=400, detail="No resume uploaded for this user")
-
-    # Extract chunks and text
-    chunks = resume_profile.get("chunks", [])
-    resume_text = resume_profile.get("extracted_text", "")
-
-    if not chunks:
-        raise HTTPException(status_code=400, detail="Resume chunks not found")
-
-    # Call AI agent to get first question
-    payload = {
-        "sessionId": sessionId,
-        "resumeText": resume_text,
-        "chunks": chunks
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     }
     response = await ask_first_question(payload)
     first_question = response.get("question")
 
-<<<<<<< HEAD
     # Request first question
     try:
         ai_response = await ask_first_question(ai_payload)
@@ -162,9 +93,6 @@ async def init_interview(sessionId: str):
         raise HTTPException(status_code=500, detail="AI did not return a question")
 
     # Save first question to DB
-=======
-    # Save first question in database
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     await db.interview_answers.insert_one({
         "sessionId": sessionId,
         "questionNumber": 1,
@@ -175,7 +103,6 @@ async def init_interview(sessionId: str):
 
     return InitInterviewResponse(
         firstQuestion=first_question,
-<<<<<<< HEAD
         message="Interview initialized."
     )
 
@@ -183,16 +110,6 @@ async def init_interview(sessionId: str):
 async def submit_answer(sessionId: str, payload: AnswerRequest):
 
     # Validate session ID
-=======
-        message="Interview initialized successfully."
-    )
-
-
-@router.post("/answer/{sessionId}", response_model=AnswerResponse)
-async def submit_answer(sessionId: str, payload: AnswerRequest):
-
-    # Validate sessionId
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     try:
         session_obj_id = ObjectId(sessionId)
     except:
@@ -203,7 +120,6 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-<<<<<<< HEAD
     resume_profile = session.get("resumeProfile")
     if not resume_profile:
         raise HTTPException(status_code=400, detail="Missing resume profile.")
@@ -236,50 +152,11 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         "chunks": resume_profile.get("chunks"),
         "currentQuestionNumber": payload.questionNumber,
         "currentAnswer": payload.answer
-=======
-    # Get user's resume profile
-    user_id = session["userId"]
-    try:
-        user_obj_id = ObjectId(user_id)
-    except:
-        raise HTTPException(status_code=400, detail="Invalid user ID in session")
-
-    user = await db.users.find_one({"_id": user_obj_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    resume_profile = user.get("resumeProfile")
-    if not resume_profile:
-        raise HTTPException(status_code=400, detail="No resume uploaded for this user")
-
-    # Extract chunks and text
-    chunks = resume_profile.get("chunks", [])
-    resume_text = resume_profile.get("extracted_text", "")
-
-    # 1. Save the user's answer to the current question
-    current_q_number = payload.questionNumber
-    user_answer = payload.answer
-
-    # Update the answer for the current question
-    await db.interview_answers.update_one(
-        {"sessionId": sessionId, "questionNumber": current_q_number},
-        {"$set": {"answer": user_answer}}
-    )
-
-    # 2. Ask AI agent for the next question
-    payload = {
-        "sessionId": sessionId,
-        "resumeText": resume_text,
-        "chunks": chunks,
-        "currentQuestionNumber": current_q_number,
-        "currentAnswer": user_answer
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
     }
     response = await ask_next_question(payload)
     next_question = response.get("nextQuestion")
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+
     
     try:
         ai_response = await ask_next_question(ai_payload)
@@ -298,11 +175,9 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         )
 
     next_q_number = payload.questionNumber + 1
-=======
-    # 3. If no next question, mark interview as completed
-=======
-    # 3. If no next question, mark interview as completed and generate assessment
->>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
+
+
+
     if not next_question:
         # Get all Q&A pairs for assessment
         all_qa_pairs = await db.interview_answers.find(
@@ -375,7 +250,7 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
 
     # 4. Save next question in database
     next_q_number = current_q_number + 1
->>>>>>> ac34ecb8c408d76a300d6a884b6ad3c131614131
+
 
     # Save next question in database
     await db.interview_answers.insert_one({
