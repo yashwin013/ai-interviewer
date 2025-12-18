@@ -24,6 +24,11 @@ class VoiceSessionManager:
         self.current_transcript_buffer = ""
         self.is_processing = False
         
+        # Transcript accumulation for complete answers
+        self.accumulated_transcript = ""
+        self.silence_timer: Optional[asyncio.Task] = None
+        self.silence_duration = 6.0  # Wait 6 seconds of silence before processing answer
+        
         # Callbacks
         self.on_question_ready: Optional[Callable[[str, int], None]] = None
         self.on_interview_complete: Optional[Callable[[dict], None]] = None
@@ -121,17 +126,50 @@ class VoiceSessionManager:
                 await self.on_error(str(e))
     
     async def _handle_transcript(self, text: str, is_final: bool):
-        """Handle transcription results from STT."""
-        if is_final and not self.is_processing:
-            # Final transcription - process as answer
-            self.current_transcript_buffer = text
-            print(f"[SESSION {self.session_id}] Final transcript: {text}")
+        """Handle transcription results from STT with proper accumulation."""
+        if not text.strip():
+            return
+        
+        if is_final:
+            # Accumulate final transcripts
+            if self.accumulated_transcript:
+                self.accumulated_transcript += " " + text
+            else:
+                self.accumulated_transcript = text
             
-            # Process the answer
-            await self._process_answer(text)
+            print(f"[SESSION {self.session_id}] Accumulated: {self.accumulated_transcript}")
+            
+            # Cancel existing silence timer
+            if self.silence_timer and not self.silence_timer.done():
+                self.silence_timer.cancel()
+            
+            # Start new silence timer
+            self.silence_timer = asyncio.create_task(self._silence_timeout())
         else:
-            # Interim result - just log
+            # Interim result - just log for debugging
             print(f"[SESSION {self.session_id}] Interim: {text}")
+    
+    async def _silence_timeout(self):
+        """Wait for silence, then process the accumulated answer."""
+        try:
+            await asyncio.sleep(self.silence_duration)
+            
+            # Silence detected - process the complete answer
+            if self.accumulated_transcript and not self.is_processing:
+                complete_answer = self.accumulated_transcript.strip()
+                print(f"[SESSION {self.session_id}] Complete answer after silence: {complete_answer}")
+                
+                # Reset accumulator
+                self.accumulated_transcript = ""
+                
+                # Process the complete answer
+                await self._process_answer(complete_answer)
+        except asyncio.CancelledError:
+            # Timer was cancelled because more speech came in
+            print(f"[SESSION {self.session_id}] Silence timer cancelled (user still speaking)")
+        except Exception as e:
+            print(f"[SESSION ERROR] Silence timeout error: {str(e)}")
+
     
     async def _process_answer(self, answer: str):
         """Process user's answer and get next question."""
