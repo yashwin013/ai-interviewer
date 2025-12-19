@@ -190,7 +190,7 @@ class Orchestrator:
         print(f"🎙️ Recording for {duration} seconds...")
 
         audio = sd.rec(int(duration * sample_rate),
-                       samplerate=sample_rate, channels=1, dtype='float64')
+                    samplerate=sample_rate, channels=1, dtype='float64')
         sd.wait()
 
         audio_int16 = np.int16(audio * 32767)
