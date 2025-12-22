@@ -69,7 +69,7 @@ class RealtimeSTTService:
                 language="en-US",
                 smart_format=True,
                 interim_results=True,
-                utterance_end_ms="3000",  # Wait 3 seconds of silence before finalizing
+                utterance_end_ms="2000",  # Wait 2 seconds of silence before finalizing
                 vad_events=True,
                 encoding="linear16",
                 sample_rate=16000,

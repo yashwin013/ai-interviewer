@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import JobBoard from "./pages/JobBoard";
+import JobDetail from "./pages/JobDetail";
+import JobApplicationSuccess from "./pages/JobApplicationSuccess";
 import InterviewHistory from "./pages/InterviewHistory";
 import InterviewResults from "./pages/InterviewResults";
 import Analytics from "./pages/Analytics";
@@ -73,6 +75,26 @@ function App() {
           element={
             isLoggedIn ? (
               <JobBoard userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/jobs/:jobId"
+          element={
+            isLoggedIn ? (
+              <JobDetail userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/jobs/apply-success"
+          element={
+            isLoggedIn ? (
+              <JobApplicationSuccess userEmail={userData?.email} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )

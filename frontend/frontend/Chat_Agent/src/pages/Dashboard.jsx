@@ -2,15 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from '../components/dashboard/Sidebar';
-import { getAllJobs } from '../services/apiService';
+import { getAllJobs, getUserResults } from '../services/apiService';
 
 const Dashboard = ({ userEmail, onLogout }) => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalInterviews: 0,
+    averageScore: 0
+  });
 
   useEffect(() => {
     fetchJobs();
+    fetchStats();
   }, []);
 
   const fetchJobs = async () => {
@@ -22,6 +27,30 @@ const Dashboard = ({ userEmail, onLogout }) => {
       console.error('Failed to fetch jobs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+
+      const user = JSON.parse(userStr);
+      if (!user || !user.userId) return;
+
+      const results = await getUserResults(user.userId);
+      
+      if (results && results.length > 0) {
+        const scores = results.map(r => parseInt(r.assessment?.candidate_score_percent || 0));
+        const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / results.length);
+        
+        setStats({
+          totalInterviews: results.length,
+          averageScore: avgScore
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
     }
   };
 
@@ -63,7 +92,7 @@ const Dashboard = ({ userEmail, onLogout }) => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-500 text-sm font-medium">Total Interviews</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-2">0</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-2">{stats.totalInterviews}</p>
                   </div>
                   <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -78,7 +107,9 @@ const Dashboard = ({ userEmail, onLogout }) => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-500 text-sm font-medium">Average Score</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-2">--</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-2">
+                      {stats.totalInterviews > 0 ? `${stats.averageScore}%` : '--'}
+                    </p>
                   </div>
                   <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

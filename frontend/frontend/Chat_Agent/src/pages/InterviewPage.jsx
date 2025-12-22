@@ -49,11 +49,34 @@ const speakText = (text) => {
 const InterviewPage = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [currentQuestionNumber, setCurrentQuestionNumber] = useState(0);
-  const [interviewEnded, setInterviewEnded] = useState(false);
-  const [error, setError] = useState("");
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [questionNumber, setQuestionNumber] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  // Timer state
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  
+  // Timer effect
+  useEffect(() => {
+    let interval;
+    if (isTimerRunning && !isComplete) {
+      interval = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, isComplete]);
+  
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
   const navigate = useNavigate();
   const messagesEndRef = React.useRef(null);
   
@@ -111,6 +134,7 @@ const InterviewPage = () => {
         await speakText(firstQuestion);
 
         setCurrentQuestionNumber(1);
+        setIsTimerRunning(true); // Start the timer
       } catch (err) {
         console.error("Interview initialization error:", err);
         setError(
@@ -273,6 +297,25 @@ const InterviewPage = () => {
       <Header />
 
       <div className="mt-[138px] flex-1 max-w-5xl mx-auto w-full p-4 md:p-6 flex flex-col h-[calc(100vh-138px)]">
+        {/* Timer Display - Top Right */}
+        {sessionId && (
+          <div className="fixed top-[150px] right-6 z-50">
+            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl px-6 py-3 border border-purple-200 hover:shadow-2xl transition-all">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">Interview Time</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                    {formatTime(elapsedTime)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Mode Selection Banner */}
         <div className="mb-4 bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-300 rounded-xl p-4">
           <div className="flex items-center justify-between">

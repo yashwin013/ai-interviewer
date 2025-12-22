@@ -73,8 +73,8 @@ class InitInterviewResponse(BaseModel):
 
 class NextQuestionRequest(BaseModel):
     sessionId: str
-    resumeText: str
-    chunks: List[str]
+    resumeText: Optional[str] = None  # Optional - AI agent uses cached data
+    chunks: Optional[List[str]] = None  # Optional - AI agent uses cached data
     currentQuestionNumber: int
     currentAnswer: str
 
@@ -109,7 +109,7 @@ class GenerateAssessmentResponse(BaseModel):
 # Initialize Grok (xAI) models - using OpenAI-compatible API
 # Grok API is compatible with OpenAI SDK, just need to change base_url
 llm = ChatOpenAI(
-    model="grok-2-1212",  # Grok model with structured output support
+    model="gpt-4o",  # OpenAI GPT-4o model with structured output support
     temperature=0.7,
     base_url="https://api.x.ai/v1",  # Grok API endpoint
     api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")  # Support both env vars
@@ -145,6 +145,23 @@ def parse_resume_from_chunks(resume_text: str, chunks: List[str]) -> Dict[str, A
         Dictionary with candidate information
     """
     # Use the full resume text for extraction (chunks are for context later)
+    # Create prompt for JSON extraction
+    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
+
+Resume:
+{resume_text}
+
+Return a JSON object with these exact fields:
+- candidate_first_name: string
+- candidate_last_name: string
+- candidate_email: string
+- candidate_linkedin: string
+- experience: string (summary of work experience)
+- skills: array of strings
+- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
+
+Return ONLY the JSON object, no other text."""
+    
     # Create prompt for JSON extraction
     prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
 
@@ -499,12 +516,15 @@ async def next_question(request: NextQuestionRequest):
                     answer=request.currentAnswer
                 )
         
-        # Get updated session data
+        # Get updated session data (from cache, NOT from request payload)
         questions_asked = session_manager.get_questions_asked(request.sessionId)
         max_questions = session_manager.get_max_questions(request.sessionId)
         resume_profile = session_manager.get_resume_profile(request.sessionId)
         chunks = session_manager.get_chunks(request.sessionId)
         
+        print(f"[CACHE] Using cached resume context (ignoring payload)")
+        print(f"[CACHE] Cached chunks count: {len(chunks)}")
+        print(f"[CACHE] Cached profile seniority: {resume_profile.get('seniority_level')}")
         print(f"[DEBUG] Questions asked: {questions_asked}/{max_questions}")
         
         # Build chat history for context
@@ -603,6 +623,10 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         print(f"[DEBUG] Score: {assessment_dict['candidate_score_percent']}/100")
         print(f"[DEBUG] Recommendation: {assessment_dict['hiring_recommendation']}")
         
+        # Cleanup session cache after assessment is complete
+        session_manager.delete_session(request.sessionId)
+        print(f"[CACHE] Session {request.sessionId} cleaned up from cache")
+        
         return GenerateAssessmentResponse(assessment=assessment_dict)
     
     except Exception as e:
@@ -621,11 +645,6 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-<<<<<<< HEAD
-        "api_key_configured": bool(os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")),
-        "api_provider": "Grok (xAI)" if os.getenv("XAI_API_KEY") else "OpenAI"
-=======
->>>>>>> 00704b1aff7843ddd94eb3a15aca4bfa0876d6d5
     }
 
 
