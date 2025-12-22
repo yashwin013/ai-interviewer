@@ -104,7 +104,7 @@ class Orchestrator:
         self.embeddings = embeddings
         self.use_audio = use_audio and AUDIO_AVAILABLE
 
-        # Build prompt templates used in original file (adapted)
+        # Build prompt templates
         self._build_prompts()
         # Job Matching
         self.job_matching = Job_Matcher(self.embeddings) # Initializing the Job Matcher object with model's embeddings
