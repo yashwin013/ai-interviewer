@@ -27,7 +27,7 @@ class VoiceSessionManager:
         # Transcript accumulation for complete answers
         self.accumulated_transcript = ""
         self.silence_timer: Optional[asyncio.Task] = None
-        self.silence_duration = 6.0  # Wait 6 seconds of silence before processing answer
+        self.silence_duration = 3.0  # Wait 3 seconds of silence before processing answer
         
         # Callbacks
         self.on_question_ready: Optional[Callable[[str, int], None]] = None
@@ -189,14 +189,14 @@ class VoiceSessionManager:
             print(f"[SESSION {self.session_id}] Saved answer for Q{self.current_question_number}")
             
             # Ask AI agent for next question
+            # AI agent uses session cache - no need to send resume text/chunks
             print(f"[SESSION {self.session_id}] Requesting next question from AI agent...")
             import time
             start_time = time.time()
             
             payload = {
                 "sessionId": self.session_id,
-                "resumeText": self.resume_text,
-                "chunks": self.chunks,
+                # resumeText and chunks NOT sent - AI agent retrieves from cache
                 "currentQuestionNumber": self.current_question_number,
                 "currentAnswer": answer
             }

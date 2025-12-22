@@ -81,8 +81,8 @@ async def get_all_jobs(
     skip = (page - 1) * limit
     total_pages = (total + limit - 1) // limit
     
-    # Get jobs
-    jobs_cursor = db.jobs.find(query).skip(skip).limit(limit)
+    # Get jobs with consistent sorting
+    jobs_cursor = db.jobs.find(query).sort("_id", 1).skip(skip).limit(limit)
     jobs = await jobs_cursor.to_list(length=limit)
     
     # Format response

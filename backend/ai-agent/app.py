@@ -73,8 +73,8 @@ class InitInterviewResponse(BaseModel):
 
 class NextQuestionRequest(BaseModel):
     sessionId: str
-    resumeText: str
-    chunks: List[str]
+    resumeText: Optional[str] = None  # Optional - AI agent uses cached data
+    chunks: Optional[List[str]] = None  # Optional - AI agent uses cached data
     currentQuestionNumber: int
     currentAnswer: str
 
@@ -496,12 +496,15 @@ async def next_question(request: NextQuestionRequest):
                     answer=request.currentAnswer
                 )
         
-        # Get updated session data
+        # Get updated session data (from cache, NOT from request payload)
         questions_asked = session_manager.get_questions_asked(request.sessionId)
         max_questions = session_manager.get_max_questions(request.sessionId)
         resume_profile = session_manager.get_resume_profile(request.sessionId)
         chunks = session_manager.get_chunks(request.sessionId)
         
+        print(f"[CACHE] Using cached resume context (ignoring payload)")
+        print(f"[CACHE] Cached chunks count: {len(chunks)}")
+        print(f"[CACHE] Cached profile seniority: {resume_profile.get('seniority_level')}")
         print(f"[DEBUG] Questions asked: {questions_asked}/{max_questions}")
         
         # Build chat history for context
@@ -599,6 +602,10 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         print(f"[DEBUG] Assessment generated successfully")
         print(f"[DEBUG] Score: {assessment_dict['candidate_score_percent']}/100")
         print(f"[DEBUG] Recommendation: {assessment_dict['hiring_recommendation']}")
+        
+        # Cleanup session cache after assessment is complete
+        session_manager.delete_session(request.sessionId)
+        print(f"[CACHE] Session {request.sessionId} cleaned up from cache")
         
         return GenerateAssessmentResponse(assessment=assessment_dict)
     
