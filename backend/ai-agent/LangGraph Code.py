@@ -190,7 +190,7 @@ class Orchestrator:
         print(f"🎙️ Recording for {duration} seconds...")
 
         audio = sd.rec(int(duration * sample_rate),
-                       samplerate=sample_rate, channels=1, dtype='float64')
+                    samplerate=sample_rate, channels=1, dtype='float64')
         sd.wait()
 
         audio_int16 = np.int16(audio * 32767)
@@ -247,18 +247,18 @@ class Orchestrator:
         # Build simple Document list for vectorstore (optional)
         documents = [
             Document(page_content=f"Name: {profile['candidate_first_name']} {profile['candidate_last_name']}",
-                     metadata={"type": "name", "value": f"{profile['candidate_first_name']} {profile['candidate_last_name']}"}
-                     ),
+                    metadata={"type": "name", "value": f"{profile['candidate_first_name']} {profile['candidate_last_name']}"}
+                    ),
             Document(page_content=f"Email: {profile['candidate_email']}",
-                     metadata={"type": "email", "value": profile['candidate_email']}),
+                    metadata={"type": "email", "value": profile['candidate_email']}),
             Document(page_content=f"LinkedIn: {profile['candidate_linkedin']}",
-                     metadata={"type": "linkedin", "value": profile['candidate_linkedin']}),
+                    metadata={"type": "linkedin", "value": profile['candidate_linkedin']}),
             Document(page_content=f"Experience: {profile['experience']}",
-                     metadata={"type": "experience", "value": profile['experience']}),
+                    metadata={"type": "experience", "value": profile['experience']}),
             Document(page_content=f"Skills: {profile['skills']}",
-                     metadata={"type": "skills", "value": profile['skills']}),
+                    metadata={"type": "skills", "value": profile['skills']}),
             Document(page_content=f"Seniority: {profile['seniority_level']}",
-                     metadata={"type": "seniority", "value": profile['seniority_level']}),
+                    metadata={"type": "seniority", "value": profile['seniority_level']}),
         ]
 
         vectorstore = None

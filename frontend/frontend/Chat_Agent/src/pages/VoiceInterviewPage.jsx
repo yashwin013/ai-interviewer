@@ -13,6 +13,10 @@ const VoiceInterviewPage = () => {
   const hasInitialized = React.useRef(false); // Prevent duplicate initialization
   const hasStartedRecording = React.useRef(false); // Prevent duplicate recording
   
+  // Timer state
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  
   const {
     isConnected,
     isRecording,
@@ -29,6 +33,24 @@ const VoiceInterviewPage = () => {
     stopRecording,
     endInterview
   } = useVoiceInterview(sessionId);
+  
+  // Timer effect
+  useEffect(() => {
+    let interval;
+    if (isTimerRunning && !isComplete) {
+      interval = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, isComplete]);
+  
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
   
   // Get real-time frequency data for visualization
   const frequencyData = useAudioVisualizer(audioStream);
@@ -86,6 +108,7 @@ const VoiceInterviewPage = () => {
       console.log('[INIT] Auto-starting recording...');
       setTimeout(() => {
         startRecording();
+        setIsTimerRunning(true); // Start the timer
       }, 1000);
     }
   }, [isConnected, isRecording, isComplete, startRecording]);
@@ -162,7 +185,7 @@ const VoiceInterviewPage = () => {
   }
   
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
       {/* Animated Background Elements */}
       <style>{`
         @keyframes gradient-shift {
@@ -192,6 +215,25 @@ const VoiceInterviewPage = () => {
       `}</style>
 
       <Header />
+      
+      {/* Timer Display - Top Right */}
+      {sessionId && (
+        <div className="fixed top-[150px] right-6 z-50">
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl px-6 py-3 border border-purple-200 hover:shadow-2xl transition-all">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Interview Time</p>
+                <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  {formatTime(elapsedTime)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="mt-[138px] flex-1 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full">

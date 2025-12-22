@@ -258,7 +258,7 @@ export const useVoiceInterview = (sessionId) => {
       const utterance = new SpeechSynthesisUtterance(text);
       
       // ===== CUSTOMIZE VOICE HERE =====
-      utterance.rate = 1.0;      // Speed: 1.0 = normal (try 0.8-1.5)
+      utterance.rate = 1.1;      // Speed: 1.0 = normal (try 0.8-1.5)
       utterance.pitch = 1.0;     // Pitch: 1.0 = normal (try 0.8-1.3)
       utterance.volume = 1;      // Volume: 1 = full volume
       utterance.lang = 'en-US';  // Language
@@ -269,11 +269,12 @@ export const useVoiceInterview = (sessionId) => {
       
       // Priority order: Google > Microsoft > Samantha > Default
       const preferredVoice = 
+        voices.find(v => v.name.includes('Samantha')) ||                   // macOS female
+        voices.find(v => v.name.includes('Google UK English Male')) ||     // Natural male
         voices.find(v => v.name.includes('Google UK English Female')) ||  // Natural female
         voices.find(v => v.name.includes('Google US English')) ||         // Google voices
         voices.find(v => v.name.includes('Microsoft Zira')) ||            // Microsoft female
         voices.find(v => v.name.includes('Microsoft David')) ||           // Microsoft male
-        voices.find(v => v.name.includes('Samantha')) ||                  // macOS female
         voices.find(v => v.name.includes('Google')) ||                    // Any Google
         voices.find(v => v.name.includes('Microsoft')) ||                 // Any Microsoft
         voices[0];                                                         // Fallback to first

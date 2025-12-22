@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from '../components/dashboard/Sidebar';
 import { getAllJobs, searchJobs } from '../services/apiService';
 
 const JobBoard = ({ userEmail, onLogout }) => {
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,6 +111,7 @@ const JobBoard = ({ userEmail, onLogout }) => {
                     {jobs.map((job) => (
                       <div 
                         key={job.jobId} 
+                        onClick={() => navigate(`/dashboard/jobs/${job.jobId}`)}
                         className="border border-gray-200 rounded-xl p-6 hover:border-purple-300 hover:shadow-lg transition cursor-pointer group"
                       >
                         <div className="flex items-start justify-between mb-3">
@@ -118,6 +121,9 @@ const JobBoard = ({ userEmail, onLogout }) => {
                             </h3>
                             <p className="text-gray-600 font-medium text-lg">{job.company}</p>
                           </div>
+                          <svg className="w-6 h-6 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
                         </div>
                         
                         <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
@@ -149,11 +155,16 @@ const JobBoard = ({ userEmail, onLogout }) => {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {job.skills && job.skills.map((skill, idx) => (
+                          {job.skills && job.skills.slice(0, 5).map((skill, idx) => (
                             <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium">
                               {skill}
                             </span>
                           ))}
+                          {job.skills && job.skills.length > 5 && (
+                            <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium">
+                              +{job.skills.length - 5} more
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}

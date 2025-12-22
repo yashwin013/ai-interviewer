@@ -79,10 +79,8 @@ async def init_interview(sessionId: str):
         "resumeText": resume_profile.get("extracted_text"),
         "chunks": resume_profile.get("chunks")
     }
-    response = await ask_first_question(payload)
-    first_question = response.get("question")
 
-    # Request first question
+    # Request first question from AI agent
     try:
         ai_response = await ask_first_question(ai_payload)
         first_question = ai_response.get("question")
@@ -145,17 +143,14 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
             "updatedAt": datetime.utcnow()
         })
 
-    
+    # Call AI agent for next question
+    # AI agent uses session cache - no need to send resume text/chunks
     ai_payload = {
         "sessionId": sessionId,
-        "resumeText": resume_profile.get("extracted_text"),
-        "chunks": resume_profile.get("chunks"),
+        # resumeText and chunks are NOT sent - AI agent retrieves from cache
         "currentQuestionNumber": payload.questionNumber,
         "currentAnswer": payload.answer
     }
-    response = await ask_next_question(payload)
-    next_question = response.get("nextQuestion")
-
     
     try:
         ai_response = await ask_next_question(ai_payload)
@@ -166,19 +161,7 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
             detail=f"AI Agent Error: {str(e)}"
         )
 
-    if not next_question:
-        return AnswerResponse(
-            nextQuestion=None,
-            nextQuestionNumber=None,
-            message="Interview completed."
-        )
-
-    next_q_number = payload.questionNumber + 1
-
-    # 3. If no next question, mark interview as completed
-
-    # 3. If no next question, mark interview as completed and generate assessment
-
+    # If no next question, interview is complete - generate assessment
     if not next_question:
         # Get all Q&A pairs for assessment
         all_qa_pairs = await db.interview_answers.find(
@@ -196,8 +179,8 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         # Call AI agent for assessment
         assessment_payload = {
             "sessionId": sessionId,
-            "resumeText": resume_text,
-            "chunks": chunks,
+            "resumeText": resume_profile.get("extracted_text"),
+            "chunks": resume_profile.get("chunks"),
             "transcript": transcript,
             "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior")
         }
@@ -225,16 +208,16 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         # Save results to dedicated results collection
         if assessment_data:
             result_doc = {
-                "userId": user_id,
+                "userId": session.get("userId"),
                 "sessionId": sessionId,
-                "candidateName": user.get("name", ""),
-                "candidateEmail": user.get("email", ""),
+                "candidateName": resume_profile.get("name", ""),
+                "candidateEmail": resume_profile.get("email", ""),
                 "assessment": assessment_data,
                 "transcript": transcript,
                 "resumeProfile": {
                     "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior"),
                     "skills": resume_profile.get("skills", []),
-                    "experience": resume_profile.get("experience", [])
+                    "experience": resume_profile.get("experience", "")
                 },
                 "createdAt": datetime.utcnow()
             }
@@ -249,11 +232,9 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
             assessment=assessment_data
         )
 
-    # 4. Save next question in database
-    next_q_number = current_q_number + 1
-
-
-    # Save next question in database
+    # Interview continues - save next question in database
+    next_q_number = payload.questionNumber + 1
+    
     await db.interview_answers.insert_one({
         "sessionId": sessionId,
         "questionNumber": next_q_number,
@@ -262,8 +243,7 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
         "createdAt": datetime.utcnow()
     })
 
-    
-    # 5. Return next question
+    # Return next question
     return AnswerResponse(   
         nextQuestion=next_question,
         nextQuestionNumber=next_q_number,
