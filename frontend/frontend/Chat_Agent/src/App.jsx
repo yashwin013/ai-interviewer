@@ -9,10 +9,13 @@ import InterviewResults from "./pages/InterviewResults";
 import Analytics from "./pages/Analytics";
 import ResumeUpload from "./pages/ResumeUpload";
 import ResumeSummary from "./pages/ResumeSummary";
+import ResumeManagement from "./pages/ResumeManagement";
+import ATSScore from "./pages/ATSScore";
 import InterviewPage from "./pages/InterviewPage";
 import VoiceInterviewPage from "./pages/VoiceInterviewPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -130,31 +133,43 @@ function App() {
             )
           }
         />
+        {/* Resume Management Page */}
         <Route
-          path="/upload"
+          path="/dashboard/resume"
           element={
             isLoggedIn ? (
-              <ResumeUpload userEmail={userData?.email} onLogout={handleLogout} />
+              <ResumeManagement userEmail={userData?.email} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )
           }
+        />
+        {/* ATS Resume Score Page */}
+        <Route
+          path="/dashboard/resume/ats-score"
+          element={
+            isLoggedIn ? (
+              <ATSScore userEmail={userData?.email} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+
+        {/* Redirect old upload routes to dashboard */}
+        <Route
+          path="/upload"
+          element={<Navigate to="/dashboard" replace />}
         />
         <Route
           path="/resume-summary"
-          element={
-            isLoggedIn ? (
-              <ResumeSummary />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
+          element={<Navigate to="/dashboard" replace />}
         />
         <Route
-          path="/start-interview"
+          path="/interview"
           element={
             isLoggedIn ? (
-              <InterviewPage />
+              <VoiceInterviewPage userEmail={userData?.email} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )
@@ -164,7 +179,7 @@ function App() {
           path="/voice-interview"
           element={
             isLoggedIn ? (
-              <VoiceInterviewPage />
+              <VoiceInterviewPage userEmail={userData?.email} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )

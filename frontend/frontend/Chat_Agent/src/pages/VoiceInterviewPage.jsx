@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startInterview } from '../services/apiService';
+import { startInterview, getResumeStatus } from '../services/apiService';
 import { useVoiceInterview } from '../hooks/useVoiceInterview';
 import { useAudioVisualizer } from '../hooks/useAudioVisualizer';
 import CircularWaveform from '../components/CircularWaveform';
 import Header from './Header';
 
-const VoiceInterviewPage = () => {
+const VoiceInterviewPage = ({ userEmail, onLogout }) => {
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -74,6 +74,15 @@ const VoiceInterviewPage = () => {
           return;
         }
         
+        // Check if user has uploaded resume
+        const resumeStatus = await getResumeStatus(user.userId);
+        
+        if (!resumeStatus.hasResume) {
+          alert('Please upload your resume before starting an interview.');
+          navigate('/dashboard');
+          return;
+        }
+        
         // Create interview session
         const response = await startInterview(user.userId);
         const newSessionId = response.sessionId;
@@ -84,7 +93,7 @@ const VoiceInterviewPage = () => {
       } catch (err) {
         console.error('[INIT] Failed to create session:', err);
         alert('Failed to start interview. Please try again.');
-        navigate('/upload');
+        navigate('/dashboard');
       } finally {
         setIsInitializing(false);
       }
@@ -185,8 +194,8 @@ const VoiceInterviewPage = () => {
   }
   
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
-      {/* Animated Background Elements */}
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 relative overflow-hidden">
+      {/* Enhanced Animated Background Elements */}
       <style>{`
         @keyframes gradient-shift {
           0%, 100% { background-position: 0% 50%; }
@@ -205,16 +214,71 @@ const VoiceInterviewPage = () => {
           50% { transform: scale(1); opacity: 0.8; }
           100% { transform: scale(0.95); opacity: 0.5; }
         }
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes wave {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          50% { transform: translateX(-25%) translateY(-10%); }
+        }
+        @keyframes wave-reverse {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          50% { transform: translateX(25%) translateY(10%); }
+        }
         .animate-gradient {
           background-size: 200% 200%;
           animation: gradient-shift 8s ease infinite;
         }
         .animate-float { animation: float 6s ease-in-out infinite; }
         .animate-fade-in { animation: fade-in 0.6s ease-out; }
-        .animate-pulse-ring { animation: pulse-ring 2s ease-in-out infinite; }
+        .animate-pulse-ring { animation: pulse-ring 1.5s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 20s linear infinite; }
+        .animate-wave { animation: wave 15s ease-in-out infinite; }
+        .animate-wave-reverse { animation: wave-reverse 20s ease-in-out infinite; }
       `}</style>
 
-      <Header />
+      {/* Background Wave Patterns */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Wave 1 - Purple */}
+        <div className="absolute -top-1/2 -left-1/4 w-full h-full opacity-10 animate-wave">
+          <svg viewBox="0 0 1200 600" className="w-full h-full">
+            <path
+              d="M0,300 Q300,100 600,300 T1200,300 L1200,600 L0,600 Z"
+              fill="url(#wave-gradient-1)"
+            />
+            <defs>
+              <linearGradient id="wave-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#a855f7" />
+                <stop offset="100%" stopColor="#6366f1" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        
+        {/* Wave 2 - Blue */}
+        <div className="absolute -bottom-1/2 -right-1/4 w-full h-full opacity-10 animate-wave-reverse">
+          <svg viewBox="0 0 1200 600" className="w-full h-full">
+            <path
+              d="M0,300 Q300,500 600,300 T1200,300 L1200,0 L0,0 Z"
+              fill="url(#wave-gradient-2)"
+            />
+            <defs>
+              <linearGradient id="wave-gradient-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#3b82f6" />
+                <stop offset="100%" stopColor="#06b6d4" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        
+        {/* Floating Orbs */}
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-300/20 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-300/20 rounded-full blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
+        <div className="absolute top-1/2 right-1/3 w-48 h-48 bg-indigo-300/20 rounded-full blur-3xl animate-float" style={{animationDelay: '4s'}}></div>
+      </div>
+
+      <Header userEmail={userEmail} onLogout={onLogout} />
       
       {/* Timer Display - Top Right */}
       {sessionId && (

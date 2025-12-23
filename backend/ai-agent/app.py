@@ -205,45 +205,70 @@ Return ONLY the JSON object, no other text."""
 
 interviewer_prompt = ChatPromptTemplate.from_messages([
     ("system", """
-    The candidate has a seniority of: {seniority_level}.
+    You are a friendly, experienced technical interviewer conducting a {max_questions}-question interview.
+    
+    CANDIDATE PROFILE:
+    - Seniority Level: {seniority_level}
+    - Resume Context: {resume_chunks}
+    
+    YOUR PERSONALITY:
+    - Warm and encouraging, never intimidating
+    - Professional but conversational
+    - Patient and supportive
+    - Sound like a real person having a conversation
+    - Use natural, spoken language (you're, we'll, let's, I'd)
+    
+    SPEAKING STYLE (optimized for voice):
+    - Try to keep questions under 25 words for clarity
+    - Use simple, clear sentences
+    - Speak naturally - use contractions
+    - Avoid complex jargon unless necessary
+    - Sound more like a realhuman, not like a robot
+    - Use brief acknowledgments like "Great", "Interesting", "I see", "I understand", "Let's move ahead"
 
-    YOUR PRIMARY GOAL:
-    - Conduct an interview of exactly {max_questions} questions.
-    - The difficulty of questions MUST match the seniority level:
-        - Fresher: simple, conceptual, basics
-        - Junior: basic practical + scenario
-        - Mid-level: deeper, practical, applied reasoning
-        - Senior: architecture-level, ownership, end-to-end thinking  
-
-    SECONDARY GOAL:
-    Ask a balanced variety of:
-    1. Experience-based
-    2. Skill-based
-    3. Behavioral/Profile-based
-
-    RESUME CONTEXT (use this to ask relevant questions):
-    {resume_chunks}
-
-    RULE:
-    - If total_questions_asked == 0, you MUST ask an introductory question:
-        Examples:
-        * "Tell me about yourself."
-        * "Give me a brief introduction."
-        * "Walk me through your background."
+    QUESTION DIFFICULTY (must match seniority):
+    - Fresher: Basic concepts, simple scenarios, fundamentals
+    - Junior: Practical application, common problems, hands-on tasks
+    - Mid-level: System design, trade-offs, best practices, deeper reasoning
+    - Senior: Architecture, leadership, complex decisions, end-to-end ownership
+    
+    QUESTION VARIETY (balanced mix):
+    - 40% Technical skills based on resume
+    - 30% Past experience and projects
+    - 20% Problem-solving scenarios
+    - 10% Behavioral and soft skills
+    
+    CONVERSATION FLOW:
+    - Acknowledge answers briefly when appropriate
+    - If answer is too vague,short,etc, ask for more details
+    - If answer is excellent, give brief positive feedback
+    - Keep the conversation flow natural, adhering to the speaking style and personality style provided to you.
+    - Be encouraging throughout the interview conversation.
+    
+    CRITICAL RULES:
+    - First question (when total_questions_asked == 0) MUST be an introductory question:
+        * "Tell me about yourself and your background."
+        * "Walk me through your experience."
+        * "Give me a brief introduction about yourself."
+    - Never repeat questions
+    - Reference specific items from their resume when possible
+    - Ask open-ended questions that encourage detailed answers
+    - Keep questions conversational and natural for voice
     """),
 
     ("human", """
     INTERVIEW STATUS:
     Questions Asked: {total_questions_asked} / {max_questions}
 
-    TRANSCRIPT SO FAR:
+    CONVERSATION HISTORY:
     {chat_history}
 
     INSTRUCTION:
     Generate ONLY the next question.
-    Avoid repeating previous questions.
-    Make each new question cover a *new area* if possible.
-    Use the resume context to ask specific, relevant questions about the candidate's experience and skills.
+    Make it conversational and natural for voice.
+    Avoid repeating previous topics.
+    Reference the candidate's resume when relevant.
+    Keep it under 25 words.
     """)
 ])
 
@@ -510,7 +535,7 @@ async def next_question(request: NextQuestionRequest):
         # Build chat history for context
         conversation = session_manager.get_conversation_history(request.sessionId)
         chat_history = "\n\n".join([
-            f"Q: {qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
+            f"{qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
             for qa in conversation
         ])
         
@@ -615,6 +640,66 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generating assessment: {str(e)}")
+
+
+# ==================== Resume Tips Endpoint (Minimal Tokens) ====================
+
+class ResumeTipsRequest(BaseModel):
+    score: int
+    seniority: str
+    skills: List[str]
+    weak_areas: List[str]
+    resume_excerpt: str
+
+
+@app.post("/generate-resume-tips")
+async def generate_resume_tips(request: ResumeTipsRequest):
+    """
+    Generate 3 personalized resume improvement tips.
+    Uses minimal tokens (~250 total) for cost efficiency.
+    """
+    try:
+        # Build a minimal, token-efficient prompt
+        weak_areas_str = ", ".join(request.weak_areas) if request.weak_areas else "none identified"
+        skills_str = ", ".join(request.skills[:5]) if request.skills else "not specified"
+        
+        prompt = f"""Resume Analysis:
+- ATS Score: {request.score}%
+- Level: {request.seniority}
+- Skills: {skills_str}
+- Weak Areas: {weak_areas_str}
+
+Give exactly 3 specific, actionable tips to improve this resume.
+Each tip must be 1 short sentence.
+Focus on the weak areas.
+Format: numbered list only, no intro."""
+
+        # Use a lighter model or lower max_tokens for efficiency
+        response = llm.invoke(prompt)
+        
+        # Parse the response into tips
+        tips_text = response.content.strip()
+        tips = [line.strip() for line in tips_text.split('\n') if line.strip()]
+        
+        # Clean up numbering if present
+        cleaned_tips = []
+        for tip in tips[:3]:
+            # Remove leading numbers like "1.", "1)", etc.
+            import re
+            cleaned = re.sub(r'^[\d]+[\.\)\-\s]+', '', tip).strip()
+            if cleaned:
+                cleaned_tips.append(cleaned)
+        
+        return {
+            "ai_tips": cleaned_tips[:3],
+            "source": "ai",
+            "tokens_used": "~250",
+            "message": "Personalized tips based on your resume analysis"
+        }
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to generate AI tips: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate tips: {str(e)}")
 
 
 # ==================== Health Check ====================

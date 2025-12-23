@@ -2,29 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from '../components/dashboard/Sidebar';
-import { getAllJobs, getUserResults } from '../services/apiService';
+import { getRecommendedJobs, getUserResults, getResumeStatus, uploadResume } from '../services/apiService';
 
 const Dashboard = ({ userEmail, onLogout }) => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [recommendationMessage, setRecommendationMessage] = useState('');
   const [stats, setStats] = useState({
     totalInterviews: 0,
     averageScore: 0
   });
+  
+  // Resume state
+  const [resumeStatus, setResumeStatus] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
 
   useEffect(() => {
     fetchJobs();
     fetchStats();
+    fetchResumeStatus();
   }, []);
 
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const response = await getAllJobs({ page: 1, limit: 3 });
-      setJobs(response.jobs);
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+
+      const user = JSON.parse(userStr);
+      if (!user || !user.userId) return;
+
+      const response = await getRecommendedJobs(user.userId);
+      setJobs(response.jobs || []);
+      setRecommendationMessage(response.message || '');
     } catch (error) {
-      console.error('Failed to fetch jobs:', error);
+      console.error('Failed to fetch recommended jobs:', error);
     } finally {
       setLoading(false);
     }
@@ -54,16 +69,84 @@ const Dashboard = ({ userEmail, onLogout }) => {
     }
   };
 
-  const getMatchColor = (index) => {
-    if (index === 0) return 'bg-green-50 text-green-700';
-    if (index === 1) return 'bg-blue-50 text-blue-700';
-    return 'bg-yellow-50 text-yellow-700';
+  const fetchResumeStatus = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+
+      const user = JSON.parse(userStr);
+      if (!user || !user.userId) return;
+
+      const status = await getResumeStatus(user.userId);
+      setResumeStatus(status);
+    } catch (error) {
+      console.error('Failed to fetch resume status:', error);
+    }
   };
 
-  const getMatchPercentage = (index) => {
-    if (index === 0) return '95%';
-    if (index === 1) return '88%';
-    return '82%';
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      setUploadError('Please upload a PDF file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+
+      const userStr = localStorage.getItem('user');
+      const user = JSON.parse(userStr);
+
+      await uploadResume(user.userId, file);
+      
+      // Refresh resume status
+      await fetchResumeStatus();
+      
+      // Close modal
+      setShowUploadModal(false);
+      
+      // Show success message
+      alert('Resume uploaded successfully!');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError(error.response?.data?.detail || 'Failed to upload resume. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleStartInterview = () => {
+    if (!resumeStatus || !resumeStatus.hasResume) {
+      setShowUploadModal(true);
+    } else {
+      // Navigate to interview type selection or directly to interview
+      navigate('/interview');
+    }
+  };
+
+  // Helper functions for match display
+  const getMatchPercentage = (job) => {
+    if (job.match_score !== undefined) {
+      return `${job.match_score}%`;
+    }
+    return 'New';
+  };
+
+  const getMatchColor = (job) => {
+    const score = job.match_score || 0;
+    if (score >= 75) return 'bg-green-100 text-green-700';
+    if (score >= 50) return 'bg-blue-100 text-blue-700';
+    if (score >= 25) return 'bg-yellow-100 text-yellow-700';
+    return 'bg-gray-100 text-gray-700';
   };
 
   return (
@@ -83,6 +166,39 @@ const Dashboard = ({ userEmail, onLogout }) => {
               <p className="text-gray-600 text-lg">
                 Here's your interview preparation dashboard
               </p>
+            </div>
+
+            {/* Resume Status Card - Compact */}
+            <div className="bg-white/90 backdrop-blur-lg rounded-xl shadow-lg p-4 border border-white/50 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    resumeStatus?.hasResume 
+                      ? 'bg-green-100' 
+                      : 'bg-gray-100'
+                  }`}>
+                    <svg className={`w-5 h-5 ${resumeStatus?.hasResume ? 'text-green-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {resumeStatus?.hasResume ? '✓ Resume Uploaded' : 'Resume'}
+                    </p>
+                    {resumeStatus?.hasResume && (
+                      <p className="text-xs text-gray-500">
+                        Ready for interviews
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate('/dashboard/resume')}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition text-sm font-semibold"
+                >
+                  {resumeStatus?.hasResume ? 'Manage' : 'Upload'}
+                </button>
+              </div>
             </div>
 
             {/* Stats Cards */}
@@ -138,13 +254,17 @@ const Dashboard = ({ userEmail, onLogout }) => {
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <button
-                onClick={() => navigate('/upload')}
+                onClick={handleStartInterview}
                 className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition group"
               >
                 <div className="flex items-center justify-between">
                   <div className="text-left">
                     <h3 className="text-xl font-bold mb-2">Start New Interview</h3>
-                    <p className="text-purple-100">Upload your resume and begin practice</p>
+                    <p className="text-purple-100">
+                      {resumeStatus?.hasResume 
+                        ? 'Begin your practice session' 
+                        : 'Upload resume to get started'}
+                    </p>
                   </div>
                   <svg className="w-8 h-8 group-hover:translate-x-2 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -198,7 +318,7 @@ const Dashboard = ({ userEmail, onLogout }) => {
                     <div 
                       key={job.jobId} 
                       className="border border-gray-200 rounded-xl p-6 hover:border-purple-300 hover:shadow-lg transition cursor-pointer group"
-                      onClick={() => navigate(`/jobs/${job.jobId}`)}
+                      onClick={() => navigate(`/dashboard/jobs/${job.jobId}`)}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
@@ -208,8 +328,8 @@ const Dashboard = ({ userEmail, onLogout }) => {
                           <p className="text-gray-600 font-medium">{job.company}</p>
                         </div>
                         <div className="ml-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getMatchColor(index)}`}>
-                            {getMatchPercentage(index)} Match
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getMatchColor(job)}`}>
+                            {getMatchPercentage(job)} Match
                           </span>
                         </div>
                       </div>
@@ -247,6 +367,70 @@ const Dashboard = ({ userEmail, onLogout }) => {
           </div>
         </main>
       </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {resumeStatus?.hasResume ? 'Update Resume' : 'Upload Resume'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-400 transition">
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) => handleFileUpload(e.target.files[0])}
+                className="hidden"
+                id="resume-upload"
+                disabled={uploading}
+              />
+              <label
+                htmlFor="resume-upload"
+                className="cursor-pointer block"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <p className="text-lg font-semibold text-gray-800 mb-2">
+                  {uploading ? 'Uploading...' : 'Click to upload or drag and drop'}
+                </p>
+                <p className="text-sm text-gray-500">PDF only (Max 10MB)</p>
+              </label>
+            </div>
+
+            {uploadError && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{uploadError}</p>
+              </div>
+            )}
+
+            {uploading && (
+              <div className="mt-4">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
+                </div>
+                <p className="text-sm text-gray-500 text-center mt-2">Processing your resume...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -55,6 +55,88 @@ def chunk_text(raw_text: str):
     return splitter.split_text(raw_text)
 
 
+# Check if user has uploaded resume
+@router.get("/{userId}/status")
+async def get_resume_status(userId: str):
+    """
+    Check if user has uploaded a resume.
+    Returns resume status and metadata.
+    """
+    # Validate userId
+    try:
+        obj_id = ObjectId(userId)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    # Check if user exists
+    user = await db.users.find_one({"_id": obj_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if resumeProfile exists
+    resume_profile = user.get("resumeProfile")
+    
+    if not resume_profile:
+        return {
+            "hasResume": False,
+            "message": "No resume uploaded"
+        }
+    
+    # Return resume metadata
+    return {
+        "hasResume": True,
+        "message": "Resume uploaded",
+        "metadata": {
+            "name": resume_profile.get("name", "Unknown"),
+            "email": resume_profile.get("email", "Unknown"),
+            "seniorityLevel": resume_profile.get("seniority_level", "Unknown"),
+            "skillsCount": len(resume_profile.get("skills", [])),
+            "hasExtractedText": bool(resume_profile.get("extracted_text")),
+            "filePath": resume_profile.get("file_path", "")
+        }
+    }
+
+
+# Get resume PDF file
+@router.get("/{userId}/file")
+async def get_resume_file(userId: str):
+    """
+    Serve the uploaded resume PDF file.
+    """
+    from fastapi.responses import FileResponse
+    
+    # Validate userId
+    try:
+        obj_id = ObjectId(userId)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    # Check if user exists
+    user = await db.users.find_one({"_id": obj_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if resumeProfile exists
+    resume_profile = user.get("resumeProfile")
+    
+    if not resume_profile or not resume_profile.get("file_path"):
+        raise HTTPException(status_code=404, detail="No resume file found")
+    
+    file_path = resume_profile.get("file_path")
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Resume file not found on server")
+    
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline; filename=resume.pdf"
+        }
+    )
+
+
 # MAIN ROUTE: Upload + Extract Resume
 @router.post("/{userId}/upload-resume")
 async def upload_resume(userId: str, resume: UploadFile = File(...)):

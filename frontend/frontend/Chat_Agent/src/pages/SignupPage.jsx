@@ -8,6 +8,7 @@ const SignupPage = ({ onSignup }) => {
     const { loading, success, error: apiError } = useSelector((state) => state.signup);
     const navigate = useNavigate();
     const [error, setError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [form, setForm] = useState({
         name: "",
         email: "",
@@ -35,7 +36,6 @@ const SignupPage = ({ onSignup }) => {
         if (msg) return setError(msg);
 
         setError("");
-
         dispatch(signupRequest(form));
     };
 
@@ -52,22 +52,98 @@ const SignupPage = ({ onSignup }) => {
     }, [apiError]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#f0f2f5] px-4 font-sans relative overflow-hidden">
-            {/* Background Decorative Elements */}
-            <div className="absolute top-0 left-0 w-full h-1/2 bg-[#2a164b] z-0"></div>
-            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[#00c0b3] rounded-full blur-[120px] opacity-20 pointer-events-none z-0"></div>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 px-4 font-sans relative overflow-hidden">
+            {/* Enhanced Animated Background */}
+            <style>{`
+                @keyframes float {
+                    0%, 100% { transform: translateY(0px) translateX(0px); }
+                    33% { transform: translateY(-20px) translateX(10px); }
+                    66% { transform: translateY(-10px) translateX(-10px); }
+                }
+                @keyframes float-delayed {
+                    0%, 100% { transform: translateY(0px) translateX(0px); }
+                    33% { transform: translateY(-15px) translateX(-15px); }
+                    66% { transform: translateY(-25px) translateX(5px); }
+                }
+                @keyframes slide-up {
+                    from { opacity: 0; transform: translateY(30px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes scale-in {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-10px); }
+                    75% { transform: translateX(10px); }
+                }
+                .animate-float { animation: float 6s ease-in-out infinite; }
+                .animate-float-delayed { animation: float-delayed 8s ease-in-out infinite; }
+                .animate-slide-up { animation: slide-up 0.6s ease-out; }
+                .animate-scale-in { animation: scale-in 0.5s ease-out; }
+                .animate-shake { animation: shake 0.5s ease-in-out; }
+                .input-focus {
+                    transition: all 0.3s ease;
+                }
+                .input-focus:focus {
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+                }
+                .btn-ripple {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .btn-ripple::after {
+                    content: '';
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    width: 0;
+                    height: 0;
+                    border-radius: 50%;
+                    background: rgba(255, 255, 255, 0.5);
+                    transform: translate(-50%, -50%);
+                    transition: width 0.6s, height 0.6s;
+                }
+                .btn-ripple:active::after {
+                    width: 300px;
+                    height: 300px;
+                }
+            `}</style>
 
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 z-10">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-extrabold text-[#2a164b] tracking-wide mb-2">AI INTERVIEW</h1>
-                    <h2 className="text-xl font-semibold text-gray-700">Create Account</h2>                </div>
+            {/* Floating Particles */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-20 right-10 w-72 h-72 bg-indigo-500/20 rounded-full blur-3xl animate-float"></div>
+                <div className="absolute top-40 left-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float-delayed"></div>
+                <div className="absolute bottom-20 right-1/3 w-80 h-80 bg-pink-500/20 rounded-full blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
+                <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-float-delayed" style={{animationDelay: '4s'}}></div>
+            </div>
 
-                <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Glassmorphism Card */}
+            <div className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20 z-10 animate-scale-in">
+                {/* Header */}
+                <div className="text-center mb-8 animate-slide-up">
+                    <div className="inline-block p-4 bg-gradient-to-br from-indigo-500 to-pink-600 rounded-2xl mb-4 shadow-lg animate-float">
+                        <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                    </div>
+                    <h1 className="text-4xl font-extrabold text-white tracking-wide mb-2 bg-gradient-to-r from-indigo-200 to-pink-200 bg-clip-text text-transparent">
+                        AI INTERVIEW
+                    </h1>
+                    <h2 className="text-2xl font-semibold text-white/90 mb-1">Create Account</h2>
+                    <p className="text-white/60 text-sm">Join us and start your journey</p>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* Name Input */}
+                    <div className="animate-slide-up" style={{animationDelay: '0.1s'}}>
+                        <label className="block text-sm font-medium text-white/80 mb-2">Full Name</label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <svg className="h-5 w-5 text-white/40 group-focus-within:text-indigo-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
                             </div>
@@ -77,15 +153,17 @@ const SignupPage = ({ onSignup }) => {
                                 placeholder="John Doe"
                                 value={form.name}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c0b3]/50 focus:border-[#00c0b3] transition bg-gray-50 focus:bg-white"
+                                className="w-full pl-12 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition text-white placeholder-white/40 input-focus backdrop-blur-sm"
                             />
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+                    {/* Email Input */}
+                    <div className="animate-slide-up" style={{animationDelay: '0.2s'}}>
+                        <label className="block text-sm font-medium text-white/80 mb-2">Email Address</label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <svg className="h-5 w-5 text-white/40 group-focus-within:text-indigo-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                                 </svg>
                             </div>
@@ -95,50 +173,83 @@ const SignupPage = ({ onSignup }) => {
                                 placeholder="you@example.com"
                                 value={form.email}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c0b3]/50 focus:border-[#00c0b3] transition bg-gray-50 focus:bg-white"
+                                className="w-full pl-12 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition text-white placeholder-white/40 input-focus backdrop-blur-sm"
                             />
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+                    {/* Password Input */}
+                    <div className="animate-slide-up" style={{animationDelay: '0.3s'}}>
+                        <label className="block text-sm font-medium text-white/80 mb-2">Password</label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <svg className="h-5 w-5 text-white/40 group-focus-within:text-indigo-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
                             </div>
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 name="password"
                                 placeholder="••••••••"
                                 value={form.password}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c0b3]/50 focus:border-[#00c0b3] transition bg-gray-50 focus:bg-white"
+                                className="w-full pl-12 pr-12 py-3.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition text-white placeholder-white/40 input-focus backdrop-blur-sm"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-white/40 hover:text-white/80 transition"
+                            >
+                                {showPassword ? (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                )}
+                            </button>
                         </div>
+                        <p className="text-white/50 text-xs mt-1">Must be at least 6 characters</p>
                     </div>
+
+                    {/* Error Message */}
                     {error && (
-                        <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg flex items-center gap-2">
+                        <div className="bg-red-500/20 backdrop-blur-sm text-red-200 text-sm px-4 py-3 rounded-xl flex items-center gap-2 border border-red-500/30 animate-shake">
                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {error}
                         </div>
                     )}
+
+                    {/* Submit Button */}
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-[#6e46ae] text-white py-3 rounded-lg font-bold text-lg hover:bg-[#00a093] transition shadow-md hover:shadow-lg disabled:opacity-50 transform active:scale-98"
+                        className="w-full bg-gradient-to-r from-indigo-600 to-pink-600 text-white py-3.5 rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-pink-700 transition shadow-lg hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] btn-ripple animate-slide-up"
+                        style={{animationDelay: '0.4s'}}
                     >
-                        {loading ? "Creating Account..." : "Sign Up"}
+                        {loading ? (
+                            <span className="flex items-center justify-center gap-2">
+                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Creating Account...
+                            </span>
+                        ) : "Sign Up"}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center">
-                    <p className="text-gray-600 text-sm">
+                {/* Footer */}
+                <div className="text-center mt-6 animate-slide-up" style={{animationDelay: '0.5s'}}>
+                    <p className="text-white/70 text-sm">
                         Already have an account?
                         <button
-                            className="ml-2 text-[#6e46ae] font-semibold hover:underline"
+                            className="ml-2 text-indigo-300 font-semibold hover:text-indigo-200 transition hover:underline"
                             onClick={() => navigate("/login")}
                         >
                             Log In
@@ -151,4 +262,3 @@ const SignupPage = ({ onSignup }) => {
 };
 
 export default SignupPage;
-

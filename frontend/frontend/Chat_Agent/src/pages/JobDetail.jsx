@@ -159,9 +159,17 @@ const JobDetail = ({ userEmail, onLogout }) => {
             {/* Job Description */}
             <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/50 mb-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">Job Description</h2>
-              <div className="prose max-w-none text-gray-600">
+              <div className="prose max-w-none text-gray-700 leading-relaxed">
                 {job.description ? (
-                  <p className="whitespace-pre-wrap">{job.description}</p>
+                  <div 
+                    className="whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{
+                      __html: job.description
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/^• (.+)$/gm, '<li class="ml-4">$1</li>')
+                        .replace(/\n\n/g, '<br/><br/>')
+                    }}
+                  />
                 ) : (
                   <p className="text-gray-400 italic">No description available for this position.</p>
                 )}

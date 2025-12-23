@@ -36,6 +36,16 @@ export const uploadResume = async (userId, file) => {
   return response.data;
 };
 
+/**
+ * Check if user has uploaded a resume
+ * @param {string} userId - User ID
+ * @returns {Promise} - Resume status and metadata
+ */
+export const getResumeStatus = async (userId) => {
+  const response = await axiosInstance.get(`/resume/${userId}/status`);
+  return response.data;
+};
+
 
 /**
  * Start a new interview session
@@ -116,6 +126,12 @@ export const getJobById = async (jobId) => {
   return response.data;
 };
 
+// Get recommended jobs based on user's resume
+export const getRecommendedJobs = async (userId) => {
+  const response = await axiosInstance.get(`/jobs/recommended/${userId}`);
+  return response.data;
+};
+
 /**
  * Search jobs by keyword
  * @param {string} query - Search query
@@ -127,5 +143,23 @@ export const searchJobs = async (query, page = 1, limit = 20) => {
   const response = await axiosInstance.get('/jobs/search/query', {
     params: { q: query, page, limit }
   });
+  return response.data;
+};
+
+// ATS Resume Scoring
+export const getATSScore = async (userId) => {
+  const response = await axiosInstance.get(`/ats/score/${userId}`);
+  return response.data;
+};
+
+// Get quick ATS score (for dashboard preview)
+export const getQuickATSScore = async (userId) => {
+  const response = await axiosInstance.get(`/ats/quick-score/${userId}`);
+  return response.data;
+};
+
+// Get AI-powered resume tips (uses ~250 tokens)
+export const getAITips = async (userId) => {
+  const response = await axiosInstance.get(`/ats/ai-tips/${userId}`);
   return response.data;
 };
