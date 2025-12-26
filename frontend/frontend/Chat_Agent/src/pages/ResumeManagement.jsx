@@ -10,6 +10,7 @@ const ResumeManagement = ({ userEmail, onLogout }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [resumeKey, setResumeKey] = useState(Date.now()); // Cache-busting key for PDF iframe
 
   useEffect(() => {
     fetchResumeStatus();
@@ -66,6 +67,9 @@ const ResumeManagement = ({ userEmail, onLogout }) => {
       
       // Refresh resume status
       await fetchResumeStatus();
+      
+      // Update resume key to force iframe refresh (cache-busting)
+      setResumeKey(Date.now());
       
       setUploadSuccess(true);
       
@@ -145,16 +149,30 @@ const ResumeManagement = ({ userEmail, onLogout }) => {
               
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-gray-800 mb-2">
-                  {resumeStatus?.hasResume ? '✓ Resume Uploaded' : '○ No Resume Uploaded'}
+                  {resumeStatus?.hasResume ? 'Resume Uploaded' : '○ No Resume Uploaded'}
                 </h3>
                 {resumeStatus?.hasResume && resumeStatus.metadata ? (
                   <div className="space-y-1">
                     <p className="text-gray-600">
                       <span className="font-semibold">Seniority Level:</span> {resumeStatus.metadata.seniorityLevel}
                     </p>
-                    <p className="text-gray-600">
-                      <span className="font-semibold">Skills Detected:</span> {resumeStatus.metadata.skillsCount} skills
-                    </p>
+                    <div className="mt-2">
+                      <span className="font-semibold text-gray-600">Skills Detected:</span>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {resumeStatus.metadata.skills && resumeStatus.metadata.skills.length > 0 ? (
+                          resumeStatus.metadata.skills.map((skill, index) => (
+                            <span 
+                              key={index} 
+                              className="px-3 py-1 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 text-sm font-medium rounded-full border border-purple-200"
+                            >
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-500 text-sm">No skills detected</span>
+                        )}
+                      </div>
+                    </div>
                     {resumeStatus.metadata.name !== 'Unknown' && (
                       <p className="text-gray-600">
                         <span className="font-semibold">Name:</span> {resumeStatus.metadata.name}
@@ -201,6 +219,7 @@ const ResumeManagement = ({ userEmail, onLogout }) => {
               {/* PDF Viewer */}
               <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-100" style={{ height: '800px' }}>
                 <iframe
+                  key={resumeKey}
                   src={`http://localhost:8000/api/resume/${(() => {
                     try {
                       const user = JSON.parse(localStorage.getItem('user'));
@@ -208,7 +227,7 @@ const ResumeManagement = ({ userEmail, onLogout }) => {
                     } catch {
                       return '';
                     }
-                  })()}/file#toolbar=0`}
+                  })()}/file?t=${resumeKey}#toolbar=0`}
                   className="w-full h-full"
                   title="Resume PDF"
                   onError={(e) => {
@@ -271,33 +290,8 @@ const ResumeManagement = ({ userEmail, onLogout }) => {
             </div>
           )}
 
-          {/* Info Section */}
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-2xl p-6">
-            <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              How it works
-            </h3>
-            <ul className="space-y-2 text-blue-800">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-1">•</span>
-                <span>Upload your resume in PDF format</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-1">•</span>
-                <span>Our AI analyzes your experience, skills, and seniority level</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-1">•</span>
-                <span>Interview questions are tailored to your background</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 mt-1">•</span>
-                <span>Update anytime to practice for different roles</span>
-              </li>
-            </ul>
-          </div>
+          
+          
         </div>
       </div>
     </div>

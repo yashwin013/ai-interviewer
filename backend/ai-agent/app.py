@@ -4,6 +4,7 @@ Provides REST API endpoints for resume parsing and interview question generation
 """
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -85,11 +86,12 @@ class NextQuestionResponse(BaseModel):
 
 class InterviewAssessment(BaseModel):
     """Assessment generated after interview completion."""
-    candidate_score_percent: str = Field(description="Score out of 100")
-    hiring_recommendation: str = Field(description="'Definitely Hire!', 'Proceed with caution', or 'Dont hire'")
-    strengths: List[str] = Field(description="Candidate's strengths")
-    improvement_areas: List[str] = Field(description="Areas needing improvement")
-    next_steps: str = Field(description="Recommended next steps")
+    candidate_score_percent: int = Field(description="Score from 0-100 based on answer quality")
+    hiring_recommendation: str = Field(description="'Strongly Recommend', 'Recommend', 'Consider with Reservations', or 'Do Not Recommend'")
+    strengths: List[str] = Field(description="3-5 specific strengths demonstrated in answers")
+    improvement_areas: List[str] = Field(description="2-4 specific areas needing improvement")
+    next_steps: str = Field(description="Recommended next steps for hiring process")
+    answer_quality_analysis: str = Field(description="Brief analysis of answer depth and relevance")
 
 
 class GenerateAssessmentRequest(BaseModel):
@@ -106,17 +108,16 @@ class GenerateAssessmentResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
-# Initialize Grok (xAI) models - using OpenAI-compatible API
-# Grok API is compatible with OpenAI SDK, just need to change base_url
+# Initialize OpenAI models
 llm = ChatOpenAI(
-    model="gpt-4o",  # OpenAI GPT-4o model with structured output support
+    model="gpt-4o-mini",  # OpenAI GPT-4o model
     temperature=0.7,
-    base_url="https://api.x.ai/v1",  # Grok API endpoint
-    api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")  # Support both env vars
+    api_key=os.getenv("OPENAI_API_KEY")
 )
 
 # Note: Embeddings not needed for current implementation, but keeping for future use
 embeddings = OpenAIEmbeddings() if os.getenv("OPENAI_API_KEY") else None
+
 
 # ==================== Helper Functions ====================
 
@@ -196,12 +197,11 @@ Return a JSON object with these exact fields:
 
 Return ONLY the JSON object, no other text."""
     
-    # Use JSON mode instead of structured output
+    # Use JSON mode with OpenAI
     llm_json = ChatOpenAI(
-        model="grok-2-1212",
+        model="gpt-4o-mini",
         temperature=0.7,
-        base_url="https://api.x.ai/v1",
-        api_key=os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        api_key=os.getenv("OPENAI_API_KEY"),
         model_kwargs={"response_format": {"type": "json_object"}}
     )
     
@@ -297,30 +297,71 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
 
 assessment_prompt = ChatPromptTemplate.from_messages([
     ("system", """
-    You are an experienced Hiring Manager and Technical Assessor.
-    Analyze the complete interview transcript and the candidate profile to generate a structured assessment.
+    You are an expert Technical Hiring Manager with 15+ years of experience.
+    Your task is to provide an ACCURATE and DIFFERENTIATED assessment based on actual answer quality.
     
-    Consider:
-    - Technical knowledge demonstrated in answers
-    - Communication skills and clarity
-    - Problem-solving approach
-    - Depth of experience
-    - Alignment with stated seniority level
-    - Overall performance across all questions
+    SCORING RUBRIC (be strict and accurate):
     
-    Be fair but critical. Provide actionable feedback.
+    90-100%: EXCEPTIONAL
+    - Demonstrates deep expertise with specific examples
+    - Answers go beyond the question with valuable insights
+    - Shows leadership thinking and strategic perspective
+    - Perfect communication and structure
+    
+    75-89%: STRONG
+    - Solid technical knowledge with good examples
+    - Clear, well-structured answers
+    - Shows practical experience
+    - Minor gaps in depth or breadth
+    
+    60-74%: COMPETENT
+    - Adequate knowledge but lacks depth
+    - Answers are correct but somewhat generic
+    - Limited specific examples
+    - Communication is clear but not compelling
+    
+    40-59%: DEVELOPING
+    - Basic understanding with notable gaps
+    - Answers are vague or lack specificity
+    - Limited practical experience evident
+    - Needs significant development
+    
+    0-39%: INSUFFICIENT
+    - Major knowledge gaps
+    - Incorrect or irrelevant answers
+    - Poor communication
+    - Not ready for this level
+    
+    SENIORITY EXPECTATIONS:
+    - Fresher: Basic concepts, learning attitude, potential
+    - Junior: Practical skills, can execute tasks independently
+    - Mid-Senior: Deep expertise, can design solutions, mentors others
+    - Senior: Strategic thinking, architecture decisions, leadership
+    - Lead: Vision, cross-team impact, business alignment
+    
+    IMPORTANT: Score based on ACTUAL answer quality, not potential. Be specific in your analysis.
     """),
     ("human", """
     CANDIDATE PROFILE:
     {profile_doc}
     
-    SENIORITY LEVEL: {difficulty_level}
+    EXPECTED SENIORITY LEVEL: {difficulty_level}
     
-    --- COMPLETE INTERVIEW TRANSCRIPT ---
+    =====================
+    INTERVIEW TRANSCRIPT
+    =====================
     {chat_history}
     
+    =====================
+    ASSESSMENT INSTRUCTIONS
+    =====================
+    1. Evaluate EACH answer against the seniority expectations
+    2. Note specific quotes that support your scoring
+    3. Be ACCURATE - don't default to middle scores
+    4. If answers are excellent, score 80+. If poor, score below 40.
+    5. Provide actionable, specific feedback
+    
     Generate a comprehensive assessment following the InterviewAssessment schema.
-    Include specific examples from the transcript to support your evaluation.
     """)
 ])
 
@@ -403,6 +444,43 @@ def generate_next_question(
     return question.strip()
 
 
+def stream_next_question(
+    session_id: str,
+    chunks: List[str],
+    seniority_level: str,
+    max_questions: int,
+    questions_asked: int,
+    chat_history: str
+):
+    """
+    Stream the next interview question word-by-word for faster perceived response.
+    Returns a generator that yields text chunks.
+    """
+    from langchain_core.output_parsers import StrOutputParser
+    
+    # Check if interview should end
+    if questions_asked >= max_questions:
+        return None
+    
+    # Create interview chain
+    interview_chain = interviewer_prompt | llm | StrOutputParser()
+    
+    resume_context = "\n\n".join(chunks)
+    
+    context = {
+        "seniority_level": seniority_level,
+        "max_questions": max_questions,
+        "total_questions_asked": questions_asked,
+        "chat_history": chat_history,
+        "resume_chunks": resume_context
+    }
+    
+    # Stream the response
+    for chunk in interview_chain.stream(context):
+        yield chunk
+
+
+
 # ==================== API Endpoints ====================
 
 @app.get("/")
@@ -448,21 +526,76 @@ async def parse_resume(request: ParseResumeRequest):
 @app.post("/init-interview", response_model=InitInterviewResponse)
 async def init_interview(request: InitInterviewRequest):
     """
-    Initialize an interview session and generate the first question.
+    Initialize an interview session with instant introductory question.
     
-    Args:
-        request: Contains sessionId, resumeText, and chunks
-        
-    Returns:
-        First interview question
+    Flow:
+    1. Immediately return intro question (no LLM call - instant!)
+    2. Parse resume and generate first real question in background
+    3. First question is ready when user finishes answering intro
     """
+    import asyncio
+    
     try:
         print(f"[DEBUG] Initializing interview for session: {request.sessionId}")
-        print(f"[DEBUG] Resume text length: {len(request.resumeText)}")
-        print(f"[DEBUG] Number of chunks: {len(request.chunks)}")
         
-        # Parse resume to get profile
-        resume_profile = parse_resume_from_chunks(request.resumeText, request.chunks)
+        # ===== INSTANT INTRO QUESTION =====
+        # This requires NO LLM call - returns immediately!
+        intro_question = (
+            "Welcome! Before we begin with your interview, I'd like to get to know you a little better. "
+            "Could you please introduce yourself and tell me what excites you most about your career?"
+        )
+        
+        # Create a minimal session first (will be updated in background)
+        session_manager.create_session(
+            session_id=request.sessionId,
+            resume_profile={"seniority_level": "Junior", "name": "", "skills": []},  # Placeholder
+            chunks=request.chunks
+        )
+        
+        # Store intro question in session
+        session_manager.update_conversation(
+            session_id=request.sessionId,
+            question=intro_question,
+            answer=None
+        )
+        
+        print(f"[INSTANT] Returning intro question immediately!")
+        print(f"[BACKGROUND] Starting resume parsing and Q1 generation in background...")
+        
+        # ===== BACKGROUND: Parse resume + Generate Q1 =====
+        # This runs while user answers the intro question
+        asyncio.create_task(
+            generate_first_question_background(
+                session_id=request.sessionId,
+                resume_text=request.resumeText,
+                chunks=request.chunks
+            )
+        )
+        
+        return InitInterviewResponse(question=intro_question)
+        
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] Exception occurred while initializing interview:")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error initializing interview: {str(e)}")
+
+
+async def generate_first_question_background(session_id: str, resume_text: str, chunks: List[str]):
+    """
+    Background task to parse resume and generate first real question.
+    Runs while user answers the introductory question.
+    """
+    try:
+        import time
+        start_time = time.time()
+        print(f"[BACKGROUND] Starting resume parsing for session {session_id}")
+        
+        # Parse resume (takes ~1-2 seconds)
+        resume_profile = parse_resume_from_chunks(resume_text, chunks)
+        
+        elapsed = time.time() - start_time
+        print(f"[BACKGROUND] Resume parsed in {elapsed:.2f}s")
         
         # Determine max questions based on seniority
         seniority = resume_profile.get('seniority_level', 'Junior').lower()
@@ -473,56 +606,47 @@ async def init_interview(request: InitInterviewRequest):
         else:
             max_questions = 10
         
-        # Create session in session manager
-        session_manager.create_session(
-            session_id=request.sessionId,
-            resume_profile=resume_profile,
-            chunks=request.chunks
-        )
+        # Update session with actual profile
+        session = session_manager.get_session(session_id)
+        if session:
+            session["resume_profile"] = resume_profile
+            session["max_questions"] = max_questions
+            print(f"[BACKGROUND] Session updated with profile: {resume_profile.get('seniority_level')}")
         
-        print(f"[DEBUG] Session created with max_questions: {max_questions}")
-        
-        # Generate first question
+        # Generate first real question (takes ~1-2 seconds)
+        print(f"[BACKGROUND] Generating first real question...")
         first_question = generate_first_question(
-            session_id=request.sessionId,
-            chunks=request.chunks,
+            session_id=session_id,
+            chunks=chunks,
             seniority_level=resume_profile['seniority_level'],
             max_questions=max_questions
         )
         
-        # Store first question in session
-        session_manager.update_conversation(
-            session_id=request.sessionId,
-            question=first_question,
-            answer=None
-        )
+        # Store as pre-generated question (will be used when user finishes intro)
+        session_manager.set_pregenerated_question(session_id, first_question)
         
-        print(f"[DEBUG] First question generated: {first_question}")
-        
-        return InitInterviewResponse(question=first_question)
+        total_elapsed = time.time() - start_time
+        print(f"[BACKGROUND] First question pre-generated in {total_elapsed:.2f}s total")
+        print(f"[BACKGROUND] Q1: {first_question[:100]}...")
         
     except Exception as e:
+        print(f"[BACKGROUND ERROR] Failed to generate first question: {str(e)}")
         import traceback
-        print(f"[ERROR] Exception occurred while initializing interview:")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error initializing interview: {str(e)}")
+        traceback.print_exc()
 
 
 @app.post("/next-question", response_model=NextQuestionResponse)
 async def next_question(request: NextQuestionRequest):
     """
     Generate the next interview question based on the candidate's answer.
-    
-    Args:
-        request: Contains sessionId, resumeText, chunks, currentQuestionNumber, currentAnswer
-        
-    Returns:
-        Next question or null if interview is complete
+    Uses pre-generated questions for instant response when available.
     """
+    import asyncio
+    import time
+    
     try:
+        start_time = time.time()
         print(f"[DEBUG] Generating next question for session: {request.sessionId}")
-        print(f"[DEBUG] Current question number: {request.currentQuestionNumber}")
-        print(f"[DEBUG] Current answer: {request.currentAnswer[:100]}...")
         
         # Get session data
         session = session_manager.get_session(request.sessionId)
@@ -532,7 +656,6 @@ async def next_question(request: NextQuestionRequest):
         # Update conversation with the answer to current question
         conversation = session_manager.get_conversation_history(request.sessionId)
         if conversation and len(conversation) > 0:
-            # Update the last question with the answer
             last_qa = conversation[-1]
             if last_qa.get("answer") is None:
                 session_manager.update_conversation(
@@ -541,33 +664,40 @@ async def next_question(request: NextQuestionRequest):
                     answer=request.currentAnswer
                 )
         
-        # Get updated session data (from cache, NOT from request payload)
-        questions_asked = session_manager.get_questions_asked(request.sessionId)
-        max_questions = session_manager.get_max_questions(request.sessionId)
-        resume_profile = session_manager.get_resume_profile(request.sessionId)
-        chunks = session_manager.get_chunks(request.sessionId)
+        # Check for pre-generated question (instant response!)
+        pregenerated = session_manager.get_pregenerated_question(request.sessionId)
         
-        print(f"[CACHE] Using cached resume context (ignoring payload)")
-        print(f"[CACHE] Cached chunks count: {len(chunks)}")
-        print(f"[CACHE] Cached profile seniority: {resume_profile.get('seniority_level')}")
-        print(f"[DEBUG] Questions asked: {questions_asked}/{max_questions}")
-        
-        # Build chat history for context
-        conversation = session_manager.get_conversation_history(request.sessionId)
-        chat_history = "\n\n".join([
-            f"{qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
-            for qa in conversation
-        ])
-        
-        # Generate next question
-        next_q = generate_next_question(
-            session_id=request.sessionId,
-            chunks=chunks,
-            seniority_level=resume_profile['seniority_level'],
-            max_questions=max_questions,
-            questions_asked=questions_asked,
-            chat_history=chat_history
-        )
+        if pregenerated:
+            # Use pre-generated question - nearly instant!
+            next_q = pregenerated
+            elapsed = time.time() - start_time
+            print(f"[PREGEN] Used pre-generated question in {elapsed:.3f}s (instant!)")
+        else:
+            # No pre-generated question, generate normally
+            questions_asked = session_manager.get_questions_asked(request.sessionId)
+            max_questions = session_manager.get_max_questions(request.sessionId)
+            resume_profile = session_manager.get_resume_profile(request.sessionId)
+            chunks = session_manager.get_chunks(request.sessionId)
+            
+            if questions_asked >= max_questions:
+                return NextQuestionResponse(nextQuestion=None)
+            
+            conversation = session_manager.get_conversation_history(request.sessionId)
+            chat_history = "\n\n".join([
+                f"{qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
+                for qa in conversation
+            ])
+            
+            next_q = generate_next_question(
+                session_id=request.sessionId,
+                chunks=chunks,
+                seniority_level=resume_profile['seniority_level'],
+                max_questions=max_questions,
+                questions_asked=questions_asked,
+                chat_history=chat_history
+            )
+            elapsed = time.time() - start_time
+            print(f"[DEBUG] Generated question normally in {elapsed:.2f}s")
         
         if next_q:
             # Store next question in session
@@ -576,7 +706,11 @@ async def next_question(request: NextQuestionRequest):
                 question=next_q,
                 answer=None
             )
-            print(f"[DEBUG] Next question generated: {next_q}")
+            
+            # Trigger background pre-generation for NEXT-NEXT question
+            asyncio.create_task(
+                pregenerate_next_question_background(request.sessionId)
+            )
         else:
             print(f"[DEBUG] Interview completed - max questions reached")
         
@@ -589,6 +723,125 @@ async def next_question(request: NextQuestionRequest):
         print(f"[ERROR] Exception occurred while generating next question:")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating next question: {str(e)}")
+
+
+async def pregenerate_next_question_background(session_id: str):
+    """Background task to pre-generate the next question while user is answering."""
+    try:
+        import asyncio
+        # Small delay to let current response complete
+        await asyncio.sleep(0.5)
+        
+        session = session_manager.get_session(session_id)
+        if not session:
+            return
+        
+        questions_asked = session_manager.get_questions_asked(session_id)
+        max_questions = session_manager.get_max_questions(session_id)
+        
+        # Don't pre-generate if interview is about to end
+        if questions_asked >= max_questions - 1:
+            print(f"[PREGEN] Skipping pre-generation - interview near end")
+            return
+        
+        resume_profile = session_manager.get_resume_profile(session_id)
+        chunks = session_manager.get_chunks(session_id)
+        conversation = session_manager.get_conversation_history(session_id)
+        
+        chat_history = "\n\n".join([
+            f"{qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
+            for qa in conversation
+        ])
+        
+        print(f"[PREGEN] Starting background pre-generation for session {session_id}")
+        
+        pregenerated_question = generate_next_question(
+            session_id=session_id,
+            chunks=chunks,
+            seniority_level=resume_profile['seniority_level'],
+            max_questions=max_questions,
+            questions_asked=questions_asked + 1,  # For the NEXT question
+            chat_history=chat_history
+        )
+        
+        if pregenerated_question:
+            session_manager.set_pregenerated_question(session_id, pregenerated_question)
+            print(f"[PREGEN] Background pre-generation complete for session {session_id}")
+    
+    except Exception as e:
+        print(f"[PREGEN ERROR] Background pre-generation failed: {str(e)}")
+
+
+# ==================== Streaming Endpoint ====================
+
+@app.post("/next-question-stream")
+async def next_question_stream(request: NextQuestionRequest):
+    """
+    Stream the next interview question word-by-word for faster perceived response.
+    Uses Server-Sent Events (SSE) format.
+    """
+    import time
+    
+    session = session_manager.get_session(request.sessionId)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Update conversation with answer
+    conversation = session_manager.get_conversation_history(request.sessionId)
+    if conversation and len(conversation) > 0:
+        last_qa = conversation[-1]
+        if last_qa.get("answer") is None:
+            session_manager.update_conversation(
+                session_id=request.sessionId,
+                question=last_qa["question"],
+                answer=request.currentAnswer
+            )
+    
+    questions_asked = session_manager.get_questions_asked(request.sessionId)
+    max_questions = session_manager.get_max_questions(request.sessionId)
+    resume_profile = session_manager.get_resume_profile(request.sessionId)
+    chunks = session_manager.get_chunks(request.sessionId)
+    
+    conversation = session_manager.get_conversation_history(request.sessionId)
+    chat_history = "\n\n".join([
+        f"{qa['question']}\nA: {qa.get('answer', 'No answer yet')}"
+        for qa in conversation
+    ])
+    
+    def generate():
+        """Generator that streams the question."""
+        full_question = ""
+        
+        for chunk in stream_next_question(
+            session_id=request.sessionId,
+            chunks=chunks,
+            seniority_level=resume_profile['seniority_level'],
+            max_questions=max_questions,
+            questions_asked=questions_asked,
+            chat_history=chat_history
+        ):
+            full_question += chunk
+            # SSE format: data: <chunk>\n\n
+            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        
+        # Send completion signal with full question
+        yield f"data: {json.dumps({'done': True, 'fullQuestion': full_question.strip()})}\n\n"
+        
+        # Store in session
+        session_manager.update_conversation(
+            session_id=request.sessionId,
+            question=full_question.strip(),
+            answer=None
+        )
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 # ==================== Health Check ====================
@@ -607,15 +860,16 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         # Create structured LLM for assessment
         structured_assessor = llm.with_structured_output(InterviewAssessment)
         
-        # Prepare profile document
+        # Prepare detailed profile document with more context
         profile_doc = {
-            "resume_text": request.resumeText[:500],  # First 500 chars for context
-            "seniority_level": request.seniorityLevel
+            "resume_summary": request.resumeText[:2000],  # Include more resume context
+            "seniority_level": request.seniorityLevel,
+            "key_skills_from_resume": request.chunks[:3] if request.chunks else []  # First 3 resume chunks
         }
         
-        # Format chat history
+        # Format chat history with clear structure
         chat_history = "\n\n".join([
-            f"Q{i+1}: {qa.get('question', 'N/A')}\nA{i+1}: {qa.get('answer', 'N/A')}" 
+            f"QUESTION {i+1}:\n{qa.get('question', 'N/A')}\n\nCANDIDATE ANSWER {i+1}:\n{qa.get('answer', 'N/A')}" 
             for i, qa in enumerate(request.transcript)
         ])
         
@@ -638,10 +892,11 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         assessment_dict = {
             "candidate_score_percent": assessment.candidate_score_percent,
             "hiring_recommendation": assessment.hiring_recommendation,
-            "summary": f"{assessment.hiring_recommendation}. The candidate demonstrated {len(assessment.strengths)} key strengths.",
+            "summary": f"{assessment.answer_quality_analysis} Overall recommendation: {assessment.hiring_recommendation}.",
             "strengths": assessment.strengths,
-            "weaknesses": assessment.improvement_areas,  # Map improvement_areas to weaknesses
-            "recommendations": [assessment.next_steps] if isinstance(assessment.next_steps, str) else assessment.next_steps  # Map next_steps to recommendations
+            "weaknesses": assessment.improvement_areas,
+            "recommendations": [assessment.next_steps] if isinstance(assessment.next_steps, str) else assessment.next_steps,
+            "answer_quality_analysis": assessment.answer_quality_analysis
         }
         
         print(f"[DEBUG] Assessment generated successfully")

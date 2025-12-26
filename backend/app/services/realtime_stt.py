@@ -65,7 +65,7 @@ class RealtimeSTTService:
         try:
             # Configure Deepgram options
             options = LiveOptions(
-                model="nova-2",
+                model="nova-2-conversationalai",  # Optimized for voice interviews and conversations
                 language="en-US",
                 smart_format=True,
                 interim_results=True,

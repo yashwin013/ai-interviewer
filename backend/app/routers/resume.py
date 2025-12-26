@@ -91,6 +91,7 @@ async def get_resume_status(userId: str):
             "email": resume_profile.get("email", "Unknown"),
             "seniorityLevel": resume_profile.get("seniority_level", "Unknown"),
             "skillsCount": len(resume_profile.get("skills", [])),
+            "skills": resume_profile.get("skills", []),  # Include full skills array
             "hasExtractedText": bool(resume_profile.get("extracted_text")),
             "filePath": resume_profile.get("file_path", "")
         }
@@ -145,9 +146,11 @@ async def upload_resume(userId: str, resume: UploadFile = File(...)):
     1. Upload PDF
     2. Extract text using pdfplumber → fitz → OCR fallback
     3. Clean + chunk text
-    4. Save extracted_text + chunks to DB
+    4. Call AI agent to parse resume (extract skills, seniority, name, email)
+    5. Save extracted_text + chunks + parsed data to DB
     """
-
+    import httpx
+    
     # Validate ObjectId
     try:
         obj_id = ObjectId(userId)
@@ -189,13 +192,46 @@ async def upload_resume(userId: str, resume: UploadFile = File(...)):
     # Chunk for later LLM processing
     chunks = chunk_text(extracted_clean)
 
-    # SAVE in MongoDB   
+    # Call AI agent to parse resume
+    parsed_data = {}
+    try:
+        ai_agent_url = os.getenv("AI_AGENT_URL", "http://localhost:5000")
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{ai_agent_url}/parse-resume",
+                json={
+                    "userId": userId,
+                    "resumeText": extracted_clean,
+                    "chunks": chunks
+                }
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                parsed_data = result.get("resumeProfile", {})
+                print(f"[RESUME] Parsed resume data: {parsed_data}")
+            else:
+                print(f"[RESUME] AI agent parsing failed: {response.status_code}")
+    except Exception as e:
+        print(f"[RESUME] Error calling AI agent: {str(e)}")
 
+    # Build resume profile with parsed data
     resume_profile = {
         "extracted_text": extracted_clean,
         "chunks": chunks,
-        "file_path": abs_path
+        "file_path": abs_path,
+        # Parsed from AI agent
+        "name": parsed_data.get("candidate_first_name", "") + " " + parsed_data.get("candidate_last_name", ""),
+        "email": parsed_data.get("candidate_email", "Unknown"),
+        "skills": parsed_data.get("skills", []),
+        "seniority_level": parsed_data.get("seniority_level", "Unknown"),
+        "experience": parsed_data.get("experience", ""),
+        "linkedin": parsed_data.get("candidate_linkedin", "")
     }
+    
+    # Clean up name if both parts are empty
+    if resume_profile["name"].strip() == "":
+        resume_profile["name"] = "Unknown"
 
     await db.users.update_one(
         {"_id": obj_id},
@@ -203,6 +239,7 @@ async def upload_resume(userId: str, resume: UploadFile = File(...)):
     )
 
     return {
-        "message": "Resume uploaded and text extracted successfully.",
+        "message": "Resume uploaded and parsed successfully.",
         "resumeProfile": resume_profile
     }
+

@@ -240,7 +240,7 @@ const Dashboard = ({ userEmail, onLogout }) => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-500 text-sm font-medium">Jobs Available</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-2">10,000+</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-2">40</p>
                   </div>
                   <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center">
                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

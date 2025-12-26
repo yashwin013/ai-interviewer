@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { startInterview, getResumeStatus } from '../services/apiService';
 import { useVoiceInterview } from '../hooks/useVoiceInterview';
 import { useAudioVisualizer } from '../hooks/useAudioVisualizer';
-import CircularWaveform from '../components/CircularWaveform';
+import DeepgramHoop, { VoiceBotStatus } from '../components/DeepgramHoop';
 import Header from './Header';
 
 const VoiceInterviewPage = ({ userEmail, onLogout }) => {
@@ -329,12 +329,21 @@ const VoiceInterviewPage = ({ userEmail, onLogout }) => {
               </div>
             </div>
             
-            {/* Circular Waveform - Center of Attention */}
-            <div className="flex flex-col items-center justify-center py-8 animate-float">
-              <CircularWaveform 
-                frequencyData={frequencyData} 
-                isActive={isRecording && !isSpeaking}
-                isSpeaking={isSpeaking}
+            {/* Deepgram Hoop Waveform - Center of Attention */}
+            <div className="flex flex-col items-center justify-center py-8">
+              <DeepgramHoop 
+                status={
+                  !isConnected ? VoiceBotStatus.NotStarted :
+                  isSpeaking ? VoiceBotStatus.Active :
+                  isRecording ? VoiceBotStatus.Active :
+                  VoiceBotStatus.Sleeping
+                }
+                agentVolume={isSpeaking ? 0.6 + Math.random() * 0.4 : 0}
+                userVolume={isRecording && !isSpeaking && frequencyData.length > 0 
+                  ? Math.min(1, (frequencyData.reduce((a, b) => a + b, 0) / frequencyData.length / 128)) 
+                  : 0}
+                width={360}
+                height={360}
               />
               
               {/* Status Text */}
@@ -354,6 +363,26 @@ const VoiceInterviewPage = ({ userEmail, onLogout }) => {
                 ) : null}
               </div>
             </div>
+            
+            {/* End Interview Button */}
+            {isConnected && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to end the interview? Your progress will be saved and an assessment will be generated.')) {
+                      endInterview();
+                    }
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                  </svg>
+                  End Interview
+                </button>
+              </div>
+            )}
           </div>
           
           {/* Tips Card */}
