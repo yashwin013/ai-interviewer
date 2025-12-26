@@ -509,7 +509,7 @@ def main():
 
     # Configure LLMs & embeddings
     try:
-        llm_main = ChatOpenAI(model="gpt-4o")
+        llm_main = ChatOpenAI(model="gpt-4o-mini")
         embeddings = OpenAIEmbeddings()
     except Exception as e:
         print("Warning: ChatOpenAI/OpenAIEmbeddings init failed:", e)

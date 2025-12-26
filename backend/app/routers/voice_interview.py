@@ -122,8 +122,26 @@ async def voice_interview_websocket(websocket: WebSocket, session_id: str):
                             await session.process_audio_chunk(audio_bytes)
                     
                     elif message_type == "end":
-                        # Client wants to end interview
+                        # Client wants to end interview early
                         print(f"[WEBSOCKET] Client requested end for session {session_id}")
+                        
+                        # Generate assessment before ending
+                        try:
+                            print(f"[WEBSOCKET] Generating assessment for early end...")
+                            assessment = await session.generate_assessment()
+                            
+                            await websocket.send_json({
+                                "type": "complete",
+                                "assessment": assessment
+                            })
+                            print(f"[WEBSOCKET] Assessment sent for early end")
+                        except Exception as e:
+                            print(f"[WEBSOCKET] Error generating assessment: {str(e)}")
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"Error generating assessment: {str(e)}"
+                            })
+                        
                         break
                     
                     elif message_type == "ping":

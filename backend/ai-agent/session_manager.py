@@ -113,6 +113,29 @@ class SessionManager:
         """Get resume profile for a session."""
         session = self.get_session(session_id)
         return session["resume_profile"] if session else None
+    
+    # ===== PRE-GENERATION METHODS =====
+    def set_pregenerated_question(self, session_id: str, question: str) -> None:
+        """Store a pre-generated next question for faster response."""
+        with self._lock:
+            if session_id in self._sessions:
+                self._sessions[session_id]["pregenerated_question"] = question
+                print(f"[PREGEN] Stored pre-generated question for session {session_id}")
+    
+    def get_pregenerated_question(self, session_id: str) -> Optional[str]:
+        """Get and consume the pre-generated question (returns None if not available)."""
+        with self._lock:
+            if session_id in self._sessions:
+                question = self._sessions[session_id].pop("pregenerated_question", None)
+                if question:
+                    print(f"[PREGEN] Using pre-generated question for session {session_id}")
+                return question
+            return None
+    
+    def has_pregenerated_question(self, session_id: str) -> bool:
+        """Check if a pre-generated question is available."""
+        session = self.get_session(session_id)
+        return session.get("pregenerated_question") is not None if session else False
 
 
 # Global session manager instance

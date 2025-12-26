@@ -27,7 +27,7 @@ class VoiceSessionManager:
         # Transcript accumulation for complete answers
         self.accumulated_transcript = ""
         self.silence_timer: Optional[asyncio.Task] = None
-        self.silence_duration = 3.0  # Wait 3 seconds of silence before processing answer
+        self.silence_duration = 2.0  # Wait 2 seconds of silence before processing answer
         
         # Callbacks
         self.on_question_ready: Optional[Callable[[str, int], None]] = None
@@ -316,6 +316,84 @@ class VoiceSessionManager:
         print(f"[SESSION {self.session_id}] STT Error: {error}")
         if self.on_error:
             await self.on_error(f"STT Error: {error}")
+    
+    async def generate_assessment(self) -> dict:
+        """Generate assessment for early interview end. Returns assessment data."""
+        try:
+            # Get all Q&A pairs
+            all_qa_pairs = await db.interview_answers.find(
+                {"sessionId": self.session_id}
+            ).sort("questionNumber", 1).to_list(length=None)
+            
+            transcript = [
+                {"question": qa.get("question", ""), "answer": qa.get("answer", "")}
+                for qa in all_qa_pairs if qa.get("answer")
+            ]
+            
+            if not transcript:
+                return {
+                    "candidate_score_percent": 0,
+                    "hiring_recommendation": "Interview ended early - no answers recorded",
+                    "summary": "The interview was ended before any questions were answered."
+                }
+            
+            # Get user for resume profile
+            user = await db.users.find_one({"_id": ObjectId(self.user_id)})
+            resume_profile = user.get("resumeProfile", {}) if user else {}
+            
+            # Generate assessment
+            assessment_payload = {
+                "sessionId": self.session_id,
+                "resumeText": self.resume_text,
+                "chunks": self.chunks,
+                "transcript": transcript,
+                "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior")
+            }
+            
+            assessment_response = await generate_assessment(assessment_payload)
+            assessment_data = assessment_response.get("assessment", {})
+            
+            # Update session status
+            await db.interview_sessions.update_one(
+                {"_id": ObjectId(self.session_id)},
+                {
+                    "$set": {
+                        "status": "completed",
+                        "completedAt": datetime.utcnow(),
+                        "endedEarly": True
+                    }
+                }
+            )
+            
+            # Save results
+            result_doc = {
+                "userId": self.user_id,
+                "sessionId": self.session_id,
+                "candidateName": user.get("name", "") if user else "",
+                "candidateEmail": user.get("email", "") if user else "",
+                "assessment": assessment_data,
+                "transcript": transcript,
+                "resumeProfile": {
+                    "seniorityLevel": resume_profile.get("seniority_level", "Mid-Senior"),
+                    "skills": resume_profile.get("skills", []),
+                    "experience": resume_profile.get("experience", [])
+                },
+                "endedEarly": True,
+                "createdAt": datetime.utcnow()
+            }
+            
+            await db.results.insert_one(result_doc)
+            
+            self.is_active = False
+            
+            print(f"[SESSION {self.session_id}] Early end assessment completed and saved")
+            
+            return assessment_data
+            
+        except Exception as e:
+            error_msg = f"Failed to generate assessment: {str(e)}"
+            print(f"[SESSION ERROR] {error_msg}")
+            raise Exception(error_msg)
     
     async def cleanup(self):
         """Clean up session resources."""

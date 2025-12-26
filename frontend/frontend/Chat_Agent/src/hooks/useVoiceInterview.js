@@ -168,6 +168,26 @@ export const useVoiceInterview = (sessionId) => {
       
       const source = audioContext.createMediaStreamSource(stream);
       
+      // ===== NOISE REDUCTION FILTERS =====
+      // Highpass filter: cuts low frequencies (AC hum, rumble, traffic)
+      const highpassFilter = audioContext.createBiquadFilter();
+      highpassFilter.type = 'highpass';
+      highpassFilter.frequency.value = 80;  // Cut below 80Hz
+      highpassFilter.Q.value = 0.7;          // Gentle rolloff
+      
+      // Lowpass filter: cuts high frequencies (hiss, electrical noise)
+      const lowpassFilter = audioContext.createBiquadFilter();
+      lowpassFilter.type = 'lowpass';
+      lowpassFilter.frequency.value = 8000;  // Cut above 8kHz
+      lowpassFilter.Q.value = 0.7;           // Gentle rolloff
+      
+      // Optional: Notch filter for 50/60Hz power line hum
+      const notchFilter = audioContext.createBiquadFilter();
+      notchFilter.type = 'notch';
+      notchFilter.frequency.value = 50;      // 50Hz for India/EU (use 60Hz for US)
+      notchFilter.Q.value = 10;              // Narrow notch
+      // ====================================
+      
       // Create ScriptProcessor for audio processing
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
@@ -196,8 +216,11 @@ export const useVoiceInterview = (sessionId) => {
         }));
       };
       
-      // Connect nodes
-      source.connect(processor);
+      // Connect nodes with filters: source → highpass → notch → lowpass → processor → destination
+      source.connect(highpassFilter);
+      highpassFilter.connect(notchFilter);
+      notchFilter.connect(lowpassFilter);
+      lowpassFilter.connect(processor);
       processor.connect(audioContext.destination);
       
       setIsRecording(true);
