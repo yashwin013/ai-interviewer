@@ -28,10 +28,10 @@ const InterviewResults = ({ userEmail, onLogout }) => {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 80) return 'from-green-500 to-green-600';
-    if (score >= 60) return 'from-blue-500 to-blue-600';
-    if (score >= 40) return 'from-yellow-500 to-yellow-600';
-    return 'from-red-500 to-red-600';
+    if (score >= 80) return 'from-green-500 to-cyan-500';
+    if (score >= 60) return 'from-cyan-500 to-blue-500';
+    if (score >= 40) return 'from-yellow-500 to-orange-500';
+    return 'from-red-500 to-pink-500';
   };
 
   const getScoreLabel = (score) => {
@@ -43,12 +43,12 @@ const InterviewResults = ({ userEmail, onLogout }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen bg-[#0d0b1a]">
         <Header userEmail={userEmail} onLogout={onLogout} />
-        <div className="pt-[138px] flex items-center justify-center min-h-screen">
+        <div className="pt-[72px] flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading results...</p>
+            <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white/50">Loading results...</p>
           </div>
         </div>
       </div>
@@ -57,19 +57,19 @@ const InterviewResults = ({ userEmail, onLogout }) => {
 
   if (error || !result) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen bg-[#0d0b1a]">
         <Header userEmail={userEmail} onLogout={onLogout} />
-        <div className="pt-[138px] flex items-center justify-center min-h-screen">
+        <div className="pt-[72px] flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-red-600 font-semibold mb-4">{error || 'Results not found'}</p>
+            <p className="text-red-400 font-semibold mb-4">{error || 'Results not found'}</p>
             <button
               onClick={() => navigate('/dashboard/history')}
-              className="px-6 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition"
+              className="px-6 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-500 transition"
             >
               Back to History
             </button>
@@ -83,15 +83,15 @@ const InterviewResults = ({ userEmail, onLogout }) => {
   const score = assessment.candidate_score_percent || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-[#0d0b1a]">
       <Header userEmail={userEmail} onLogout={onLogout} />
       
-      <div className="pt-[138px] p-8">
+      <div className="pt-[72px] p-8">
         <div className="max-w-5xl mx-auto">
           {/* Back Button */}
           <button
             onClick={() => navigate('/dashboard/history')}
-            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-purple-600 transition"
+            className="mb-6 flex items-center gap-2 text-white/60 hover:text-cyan-400 transition"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -100,11 +100,11 @@ const InterviewResults = ({ userEmail, onLogout }) => {
           </button>
 
           {/* Header */}
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-6 border border-white/50">
+          <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 mb-6 border border-[rgba(0,217,255,0.15)]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Interview Results</h1>
-                <p className="text-gray-600">Session ID: {sessionId}</p>
+                <h1 className="text-3xl font-bold text-white mb-2">Interview Results</h1>
+                <p className="text-white/50">Session ID: {sessionId}</p>
               </div>
               <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${getScoreColor(score)} flex items-center justify-center shadow-2xl`}>
                 <div className="text-center">
@@ -115,28 +115,28 @@ const InterviewResults = ({ userEmail, onLogout }) => {
             </div>
 
             {assessment.summary && (
-              <div className="bg-gray-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">Summary</h3>
-                <p className="text-gray-700 leading-relaxed">{assessment.summary}</p>
+              <div className="bg-[#0d0b1a]/50 rounded-xl p-6 border border-[rgba(0,217,255,0.1)]">
+                <h3 className="text-lg font-semibold text-white mb-3">Summary</h3>
+                <p className="text-white/70 leading-relaxed">{assessment.summary}</p>
               </div>
             )}
           </div>
 
           {/* Strengths */}
           {assessment.strengths && assessment.strengths.length > 0 && (
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-6 border border-white/50">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="text-green-600">✓</span> Strengths
+            <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 mb-6 border border-[rgba(0,217,255,0.15)]">
+              <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <span className="text-green-400">✓</span> Strengths
               </h2>
               <div className="space-y-3">
                 {assessment.strengths.map((strength, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-green-50 rounded-xl p-4">
+                  <div key={idx} className="flex items-start gap-3 bg-green-500/10 rounded-xl p-4 border border-green-500/20">
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                    <p className="text-gray-800">{strength}</p>
+                    <p className="text-white/80">{strength}</p>
                   </div>
                 ))}
               </div>
@@ -145,19 +145,19 @@ const InterviewResults = ({ userEmail, onLogout }) => {
 
           {/* Weaknesses */}
           {assessment.weaknesses && assessment.weaknesses.length > 0 && (
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-6 border border-white/50">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="text-orange-600">⚠</span> Areas for Improvement
+            <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 mb-6 border border-[rgba(0,217,255,0.15)]">
+              <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <span className="text-orange-400">⚠</span> Areas for Improvement
               </h2>
               <div className="space-y-3">
                 {assessment.weaknesses.map((weakness, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-orange-50 rounded-xl p-4">
+                  <div key={idx} className="flex items-start gap-3 bg-orange-500/10 rounded-xl p-4 border border-orange-500/20">
                     <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     </div>
-                    <p className="text-gray-800">{weakness}</p>
+                    <p className="text-white/80">{weakness}</p>
                   </div>
                 ))}
               </div>
@@ -166,17 +166,17 @@ const InterviewResults = ({ userEmail, onLogout }) => {
 
           {/* Recommendations */}
           {assessment.recommendations && assessment.recommendations.length > 0 && (
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 mb-6 border border-white/50">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="text-blue-600">💡</span> Recommendations
+            <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 mb-6 border border-[rgba(0,217,255,0.15)]">
+              <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                <span className="text-cyan-400">💡</span> Recommendations
               </h2>
               <div className="space-y-3">
                 {assessment.recommendations.map((recommendation, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-blue-50 rounded-xl p-4">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div key={idx} className="flex items-start gap-3 bg-cyan-500/10 rounded-xl p-4 border border-cyan-500/20">
+                    <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-sm font-bold">{idx + 1}</span>
                     </div>
-                    <p className="text-gray-800">{recommendation}</p>
+                    <p className="text-white/80">{recommendation}</p>
                   </div>
                 ))}
               </div>
@@ -186,14 +186,14 @@ const InterviewResults = ({ userEmail, onLogout }) => {
           {/* Action Buttons */}
           <div className="flex gap-4">
             <button
-              onClick={() => navigate('/upload')}
-              className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition shadow-lg"
+              onClick={() => navigate('/interview')}
+              className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl font-semibold hover:from-purple-500 hover:to-cyan-500 transition shadow-lg"
             >
               Start New Interview
             </button>
             <button
               onClick={() => navigate('/dashboard/history')}
-              className="flex-1 py-4 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition shadow-lg border border-gray-200"
+              className="flex-1 py-4 bg-[#1a1633] text-white rounded-xl font-semibold hover:bg-[#1a1633]/80 transition border border-[rgba(0,217,255,0.2)]"
             >
               View All Interviews
             </button>

@@ -12,14 +12,11 @@ const speakText = (text) => {
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
-      
-      // Match settings from useVoiceInterview.js
-      utterance.rate = 1.0;      // Same speed as questions
-      utterance.pitch = 1.0;     // Same pitch as questions
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
       utterance.volume = 1;
       utterance.lang = 'en-US';
       
-      // Use same voice selection logic
       const voices = window.speechSynthesis.getVoices();
       const preferredVoice = 
         voices.find(v => v.name.includes('Google UK English Female')) ||
@@ -83,7 +80,6 @@ const InterviewPage = () => {
   const navigate = useNavigate();
   const messagesEndRef = React.useRef(null);
   
-  
   // Audio recording state
   const { 
     isRecording, 
@@ -98,7 +94,7 @@ const InterviewPage = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimerRef = React.useRef(null);
-  const MIN_RECORDING_DURATION = 4; // seconds
+  const MIN_RECORDING_DURATION = 4;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -108,7 +104,6 @@ const InterviewPage = () => {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Check if user has resume before starting interview
   useEffect(() => {
     const checkResumeAndInitialize = async () => {
       try {
@@ -120,7 +115,6 @@ const InterviewPage = () => {
           return;
         }
 
-        // Check if user has uploaded resume
         const resumeStatus = await getResumeStatus(user.userId);
         
         if (!resumeStatus.hasResume) {
@@ -129,7 +123,6 @@ const InterviewPage = () => {
           return;
         }
 
-        // Initialize interview
         setLoading(true);
         const startResponse = await startInterview(user.userId);
         const newSessionId = startResponse.sessionId;
@@ -147,7 +140,7 @@ const InterviewPage = () => {
         await speakText(firstQuestion);
 
         setCurrentQuestionNumber(1);
-        setIsTimerRunning(true); // Start the timer
+        setIsTimerRunning(true);
       } catch (err) {
         console.error("Interview initialization error:", err);
         setError(
@@ -162,18 +155,13 @@ const InterviewPage = () => {
     checkResumeAndInitialize();
   }, [navigate]);
 
-  // Transcribe audio using Whisper API
   const transcribeAudio = async (audioBlob) => {
     console.log('[TRANSCRIBE] Starting transcription...');
-    console.log('[TRANSCRIBE] Audio blob size:', audioBlob.size, 'bytes');
-    
     setIsTranscribing(true);
     
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
-      
-      console.log('[TRANSCRIBE] Sending to backend...');
       
       const response = await axios.post(
         'http://localhost:8000/api/interview/transcribe',
@@ -184,8 +172,6 @@ const InterviewPage = () => {
           }
         }
       );
-      
-      console.log('[TRANSCRIBE] Response:', response.data);
       
       if (response.data.success) {
         setInput(response.data.text);
@@ -203,14 +189,12 @@ const InterviewPage = () => {
     }
   };
 
-  // Auto-transcribe when recording stops
   useEffect(() => {
     if (audioBlob && !isRecording) {
       transcribeAudio(audioBlob);
     }
   }, [audioBlob, isRecording]);
 
-  // Recording timer
   useEffect(() => {
     if (isRecording) {
       setRecordingDuration(0);
@@ -230,7 +214,6 @@ const InterviewPage = () => {
     };
   }, [isRecording]);
 
-  // Custom stop recording with minimum duration check
   const handleStopRecording = () => {
     if (recordingDuration < MIN_RECORDING_DURATION) {
       alert(`Please record for at least ${MIN_RECORDING_DURATION} seconds. Current: ${recordingDuration}s`);
@@ -291,12 +274,12 @@ const InterviewPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 font-sans">
-        <div className="bg-white p-8 rounded-xl shadow-xl max-w-md text-center">
-          <p className="text-gray-800 font-semibold mb-2">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#0d0b1a]">
+        <div className="bg-[#1a1633] p-8 rounded-2xl shadow-xl max-w-md text-center border border-[rgba(0,217,255,0.2)]">
+          <p className="text-white font-semibold mb-2">{error}</p>
           <button
             onClick={() => navigate("/dashboard")}
-            className="mt-4 bg-[#6e46ae] text-white px-6 py-2 rounded-lg hover:bg-[#583a8b] transition"
+            className="mt-4 bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-500 transition"
           >
             Go to Dashboard
           </button>
@@ -306,21 +289,21 @@ const InterviewPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
+    <div className="min-h-screen flex flex-col bg-[#0d0b1a]">
       <Header />
 
-      <div className="mt-[138px] flex-1 max-w-5xl mx-auto w-full p-4 md:p-6 flex flex-col h-[calc(100vh-138px)]">
+      <div className="mt-[72px] flex-1 max-w-5xl mx-auto w-full p-4 md:p-6 flex flex-col h-[calc(100vh-72px)]">
         {/* Timer Display - Top Right */}
         {sessionId && (
-          <div className="fixed top-[150px] right-6 z-50">
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl px-6 py-3 border border-purple-200 hover:shadow-2xl transition-all">
+          <div className="fixed top-[84px] right-6 z-50">
+            <div className="bg-[#1a1633]/90 backdrop-blur-lg rounded-2xl shadow-xl px-6 py-3 border border-[rgba(0,217,255,0.2)]">
               <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Interview Time</p>
-                  <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  <p className="text-xs text-white/50 font-medium">Interview Time</p>
+                  <p className="text-2xl font-bold text-cyan-400">
                     {formatTime(elapsedTime)}
                   </p>
                 </div>
@@ -330,7 +313,7 @@ const InterviewPage = () => {
         )}
         
         {/* Chat Messages Container */}
-        <div className="flex-1 bg-white rounded-xl shadow-lg p-6 mb-4 overflow-y-auto">
+        <div className="flex-1 bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl border border-[rgba(0,217,255,0.15)] p-6 mb-4 overflow-y-auto">
           {messages.map((msg, idx) => (
             <div
               key={idx}
@@ -341,8 +324,8 @@ const InterviewPage = () => {
               <div
                 className={`max-w-[70%] p-4 rounded-2xl ${
                   msg.sender === "user"
-                    ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white"
-                    : "bg-gray-100 text-gray-800"
+                    ? "bg-gradient-to-r from-purple-600 to-cyan-600 text-white"
+                    : "bg-[#0d0b1a]/80 text-white/90 border border-[rgba(0,217,255,0.1)]"
                 }`}
               >
                 <p className="text-sm leading-relaxed">{msg.text}</p>
@@ -351,11 +334,11 @@ const InterviewPage = () => {
           ))}
           {loading && (
             <div className="flex justify-start mb-4">
-              <div className="bg-gray-100 p-4 rounded-2xl">
+              <div className="bg-[#0d0b1a]/80 p-4 rounded-2xl border border-[rgba(0,217,255,0.1)]">
                 <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+                  <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                  <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
                 </div>
               </div>
             </div>
@@ -365,15 +348,15 @@ const InterviewPage = () => {
 
         {/* Input Area */}
         {!interviewEnded && (
-          <div className="bg-white rounded-xl shadow-lg p-4">
+          <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl border border-[rgba(0,217,255,0.15)] p-4">
             {/* Recording Controls */}
-            <div className="mb-4 flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+            <div className="mb-4 flex items-center justify-between bg-[#0d0b1a]/50 p-4 rounded-xl border border-[rgba(0,217,255,0.1)]">
               <div className="flex items-center gap-4">
                 {!isRecording ? (
                   <button
                     onClick={startRecording}
                     disabled={isTranscribing || loading}
-                    className="bg-red-500 text-white p-4 rounded-full hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-full hover:from-red-400 hover:to-red-500 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                     title="Start Recording"
                   >
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -383,7 +366,7 @@ const InterviewPage = () => {
                 ) : (
                   <button
                     onClick={handleStopRecording}
-                    className="bg-gray-600 text-white p-4 rounded-full hover:bg-gray-700 transition animate-pulse"
+                    className="bg-white/10 text-white p-4 rounded-full hover:bg-white/20 transition animate-pulse border border-cyan-500/50"
                     title="Stop Recording"
                   >
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -393,13 +376,13 @@ const InterviewPage = () => {
                 )}
                 
                 <div>
-                  <p className="text-sm font-semibold text-gray-700">
+                  <p className="text-sm font-semibold text-white">
                     {isRecording ? `Recording... ${recordingDuration}s` : 
                      isTranscribing ? 'Transcribing...' : 
                      'Click to record your answer'}
                   </p>
                   {isRecording && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-white/50">
                       {recordingDuration < MIN_RECORDING_DURATION 
                         ? `Record for at least ${MIN_RECORDING_DURATION} seconds` 
                         : 'Click stop when done'}
@@ -412,7 +395,7 @@ const InterviewPage = () => {
                 <select
                   value={selectedDevice}
                   onChange={(e) => setSelectedDevice(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="px-3 py-2 bg-[#0d0b1a] border border-[rgba(0,217,255,0.2)] rounded-lg text-sm text-white"
                   disabled={isRecording}
                 >
                   {availableDevices.map((device) => (
@@ -433,12 +416,12 @@ const InterviewPage = () => {
                 onKeyPress={(e) => e.key === "Enter" && handleSend()}
                 placeholder="Type your answer or use voice recording..."
                 disabled={loading || interviewEnded}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                className="flex-1 px-4 py-3 bg-[#0d0b1a]/50 border border-[rgba(0,217,255,0.2)] rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 disabled:opacity-50 text-white placeholder-white/40"
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || loading || interviewEnded}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                className="bg-gradient-to-r from-purple-600 to-cyan-600 text-white px-8 py-3 rounded-xl hover:from-purple-500 hover:to-cyan-500 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
               >
                 Send
               </button>
@@ -447,13 +430,13 @@ const InterviewPage = () => {
         )}
 
         {interviewEnded && (
-          <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
-            <div className="text-green-600 text-5xl mb-4">✓</div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Interview Complete!</h3>
-            <p className="text-gray-600 mb-4">Generating your assessment...</p>
+          <div className="bg-green-500/10 border-2 border-green-500/30 rounded-2xl p-6 text-center">
+            <div className="text-green-400 text-5xl mb-4">✓</div>
+            <h3 className="text-xl font-bold text-white mb-2">Interview Complete!</h3>
+            <p className="text-white/60 mb-4">Generating your assessment...</p>
             <button
               onClick={() => navigate('/dashboard')}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition"
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-500 transition"
             >
               Back to Dashboard
             </button>

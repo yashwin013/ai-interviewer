@@ -20,6 +20,7 @@ export const useVoiceInterview = (sessionId) => {
   const audioStreamRef = useRef(null);
   const processorRef = useRef(null);
   const lastSpokenQuestionRef = useRef(''); // Track last spoken question to prevent duplicates
+  const isSpeakingRef = useRef(false); // Ref version for audio callback access
   
   /**
    * Connect to WebSocket server
@@ -193,6 +194,11 @@ export const useVoiceInterview = (sessionId) => {
       processorRef.current = processor;
       
       processor.onaudioprocess = (e) => {
+        // Don't send audio while AI is speaking (prevents acoustic feedback loop)
+        if (isSpeakingRef.current) {
+          return;
+        }
+        
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
           return;
         }
@@ -309,15 +315,20 @@ export const useVoiceInterview = (sessionId) => {
       
       // Track when AI starts speaking
       utterance.onstart = () => {
+        isSpeakingRef.current = true;
         setIsSpeaking(true);
+        console.log('[TTS] AI started speaking - muting microphone');
       };
       
       // Track when AI stops speaking
       utterance.onend = () => {
+        isSpeakingRef.current = false;
         setIsSpeaking(false);
+        console.log('[TTS] AI finished speaking - unmuting microphone');
       };
       
       utterance.onerror = () => {
+        isSpeakingRef.current = false;
         setIsSpeaking(false);
       };
       

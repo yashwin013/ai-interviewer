@@ -39,10 +39,19 @@ const Sidebar = () => {
         </svg>
       ),
     },
+    {
+      name: 'Resume',
+      path: '/dashboard/resume',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+    },
   ];
 
   return (
-    <aside className="w-64 bg-white/80 backdrop-blur-lg border-r border-gray-200 min-h-screen p-6">
+    <aside className="w-64 bg-[#0d0b1a]/80 backdrop-blur-xl border-r border-[rgba(0,217,255,0.1)] min-h-screen p-6">
       <nav className="space-y-2">
         {navItems.map((item) => (
           <NavLink
@@ -52,8 +61,8 @@ const Sidebar = () => {
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
                 isActive
-                  ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-purple-600/80 to-cyan-600/50 text-white shadow-lg shadow-purple-900/20 border border-cyan-500/30'
+                  : 'text-white/70 hover:text-white hover:bg-white/5'
               }`
             }
           >

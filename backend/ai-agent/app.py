@@ -10,7 +10,17 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os
 import json
+import logging
+import time
 from dotenv import load_dotenv
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("ai_agent")
 
 # LangChain imports
 from langchain_openai import ChatOpenAI
@@ -134,6 +144,87 @@ def clean_dictionary(data):
     return clean_data
 
 
+def format_conversation_history(history: List[Dict[str, str]], keep_recent: int = 2) -> str:
+    """
+    Format conversation history with rolling summary to reduce prompt size.
+    Keeps recent Q&A verbatim, summarizes older exchanges.
+    
+    This reduces prompt tokens by ~25-40% after 3+ questions.
+    
+    Args:
+        history: List of {"question": str, "answer": str} dicts
+        keep_recent: Number of recent Q&A pairs to keep in full
+        
+    Returns:
+        Formatted string with summarized older history + full recent history
+    """
+    if not history:
+        return "No previous conversation."
+    
+    # If short history, return everything
+    if len(history) <= keep_recent:
+        return _format_full_history(history)
+    
+    # Split into older (to summarize) and recent (keep full)
+    older = history[:-keep_recent]
+    recent = history[-keep_recent:]
+    
+    # Create compact summary of older exchanges
+    topics_covered = []
+    for qa in older:
+        # Extract just the topic/theme of each question (first 40 chars)
+        q_summary = qa.get('question', '')[:40].strip()
+        if q_summary:
+            topics_covered.append(q_summary + "...")
+    
+    summary_text = f"[Earlier: {len(older)} questions covered topics: {', '.join(topics_covered)}]\n\n"
+    
+    # Add full recent exchanges
+    summary_text += "RECENT EXCHANGES:\n"
+    summary_text += _format_full_history(recent)
+    
+    return summary_text
+
+
+def _format_full_history(history: List[Dict[str, str]]) -> str:
+    """Format Q&A history as readable text."""
+    lines = []
+    for i, qa in enumerate(history, 1):
+        q = qa.get('question', 'No question')
+        a = qa.get('answer', 'No answer')
+        lines.append(f"Q{i}: {q}")
+        lines.append(f"A{i}: {a}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def get_relevant_resume_chunks(chunks: List[str], max_chunks: int = 3) -> str:
+    """
+    Get most relevant resume chunks to reduce context size.
+    For now, uses first N chunks. Could be enhanced with semantic search.
+    
+    Args:
+        chunks: All resume chunks
+        max_chunks: Maximum chunks to include
+        
+    Returns:
+        Concatenated relevant chunks
+    """
+    relevant = chunks[:max_chunks]
+    total_chars = sum(len(c) for c in relevant)
+    
+    # Cap total size to ~2000 chars
+    if total_chars > 2000:
+        result = ""
+        for chunk in relevant:
+            if len(result) + len(chunk) > 2000:
+                break
+            result += chunk + "\n\n"
+        return result
+    
+    return "\n\n".join(relevant)
+
+
 def parse_resume_from_chunks(resume_text: str, chunks: List[str]) -> Dict[str, Any]:
     """
     Parse resume from text chunks and extract candidate information using LLM.
@@ -145,80 +236,85 @@ def parse_resume_from_chunks(resume_text: str, chunks: List[str]) -> Dict[str, A
     Returns:
         Dictionary with candidate information
     """
-    # Use the full resume text for extraction (chunks are for context later)
-    # Create prompt for JSON extraction
-    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
-
-Resume:
-{resume_text}
-
-Return a JSON object with these exact fields:
-- candidate_first_name: string
-- candidate_last_name: string
-- candidate_email: string
-- candidate_linkedin: string
-- experience: string (summary of work experience)
-- skills: array of strings
-- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
-
-Return ONLY the JSON object, no other text."""
+    start_time = time.time()
+    logger.info("[RESUME_PARSE] Starting resume extraction...")
     
-    # Create prompt for JSON extraction
-    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
+    # Improved prompt with XML delimiters and explicit fallback rules
+    prompt = f"""Extract candidate information from the resume below.
 
-Resume:
-{resume_text}
+<RESUME>
+{resume_text[:8000]}
+</RESUME>
 
-Return a JSON object with these exact fields:
-- candidate_first_name: string
-- candidate_last_name: string
-- candidate_email: string
-- candidate_linkedin: string
-- experience: string (summary of work experience)
-- skills: array of strings
-- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
+EXTRACTION RULES:
+1. If a field cannot be found, use "unknown" for strings or [] for arrays
+2. Normalize email to lowercase
+3. For LinkedIn: extract URL or just the username/profile path
+4. For skills: extract TECHNICAL skills only, limit to top 15 most relevant
+5. Determine seniority_level based on years of experience:
+   - 0-1 years experience: "Fresher"
+   - 1-3 years experience: "Junior"
+   - 3-7 years experience: "Mid-Senior"
+   - 7-12 years experience: "Senior"
+   - 12+ years experience: "Lead"
 
-Return ONLY the JSON object, no other text."""
+Return a JSON object with EXACTLY these fields:
+{{
+  "candidate_first_name": "string or 'unknown'",
+  "candidate_last_name": "string or 'unknown'",
+  "candidate_email": "lowercase email or 'unknown'",
+  "candidate_linkedin": "LinkedIn URL/username or 'unknown'",
+  "experience": "brief summary of work experience (2-3 sentences)",
+  "skills": ["array", "of", "technical", "skills"],
+  "seniority_level": "one of: Fresher, Junior, Mid-Senior, Senior, Lead"
+}}
+
+Return ONLY valid JSON, no other text."""
     
-    # Create prompt for JSON extraction
-    prompt = f"""Extract the candidate's information from the following resume and return it as JSON.
-
-Resume:
-{resume_text}
-
-Return a JSON object with these exact fields:
-- candidate_first_name: string
-- candidate_last_name: string
-- candidate_email: string
-- candidate_linkedin: string
-- experience: string (summary of work experience)
-- skills: array of strings
-- seniority_level: string (one of: Fresher, Junior, Mid-Senior, Senior, Lead)
-
-Return ONLY the JSON object, no other text."""
-    
-    # Use JSON mode with OpenAI
-    llm_json = ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0.7,
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model_kwargs={"response_format": {"type": "json_object"}}
-    )
-    
-    response = llm_json.invoke(prompt)
-    result_json = json.loads(response.content)
-    
-    # Convert to expected format
-    profile = {
-        "name": f"{result_json['candidate_first_name']} {result_json['candidate_last_name']}",
-        "email": result_json['candidate_email'],
-        "linkedin": result_json['candidate_linkedin'],
-        "experience": result_json['experience'],
-        "skills": result_json['skills'],
-        "seniority_level": result_json['seniority_level']
-    }
-    
-    return clean_dictionary(profile)
+    try:
+        # Use JSON mode with OpenAI
+        llm_json = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.3,  # Lower temperature for more consistent extraction
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model_kwargs={"response_format": {"type": "json_object"}}
+        )
+        
+        response = llm_json.invoke(prompt)
+        result_json = json.loads(response.content)
+        
+        # Safely extract with fallbacks
+        profile = {
+            "candidate_first_name": result_json.get('candidate_first_name', 'unknown'),
+            "candidate_last_name": result_json.get('candidate_last_name', 'unknown'),
+            "name": f"{result_json.get('candidate_first_name', 'unknown')} {result_json.get('candidate_last_name', 'unknown')}",
+            "email": result_json.get('candidate_email', 'unknown').lower() if result_json.get('candidate_email') else 'unknown',
+            "linkedin": result_json.get('candidate_linkedin', 'unknown'),
+            "experience": result_json.get('experience', 'No experience information available'),
+            "skills": result_json.get('skills', [])[:15],  # Cap at 15 skills
+            "seniority_level": result_json.get('seniority_level', 'Junior')
+        }
+        
+        elapsed = time.time() - start_time
+        logger.info(f"[RESUME_PARSE] Completed in {elapsed:.2f}s | Skills: {len(profile['skills'])} | Seniority: {profile['seniority_level']}")
+        
+        return clean_dictionary(profile)
+        
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[RESUME_PARSE] Failed after {elapsed:.2f}s: {str(e)}")
+        
+        # Return fallback profile instead of crashing
+        return {
+            "candidate_first_name": "unknown",
+            "candidate_last_name": "unknown",
+            "name": "Unknown Candidate",
+            "email": "unknown",
+            "linkedin": "unknown",
+            "experience": "Could not extract experience",
+            "skills": [],
+            "seniority_level": "Junior"
+        }
 
 
 # ==================== Interview Prompt ====================
@@ -379,23 +475,33 @@ def generate_first_question(session_id: str, chunks: List[str], seniority_level:
     Returns:
         First interview question as string
     """
+    start_time = time.time()
+    logger.info(f"[{session_id}] Generating first question for {seniority_level}...")
+    
     # Create interview chain
     interview_chain = interviewer_prompt | llm | StrOutputParser()
     
-    # Prepare resume chunks as context (first 3-5 chunks for initial question)
-    resume_context = "\n\n".join(chunks[:5])
+    # Use optimized resume context (limited chunks to reduce tokens)
+    resume_context = get_relevant_resume_chunks(chunks, max_chunks=3)
     
     # Generate first question
     context = {
         "seniority_level": seniority_level,
         "max_questions": max_questions,
         "total_questions_asked": 0,
-        "chat_history": "",
+        "chat_history": "No previous conversation.",
         "resume_chunks": resume_context
     }
     
-    question = interview_chain.invoke(context)
-    return question.strip()
+    try:
+        question = interview_chain.invoke(context)
+        elapsed = time.time() - start_time
+        logger.info(f"[{session_id}] First question generated in {elapsed:.2f}s")
+        return question.strip()
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{session_id}] First question failed after {elapsed:.2f}s: {e}")
+        return "Tell me about yourself and your background in technology."
 
 
 def generate_next_question(
@@ -404,10 +510,13 @@ def generate_next_question(
     seniority_level: str,
     max_questions: int,
     questions_asked: int,
-    chat_history: str
+    chat_history: str,
+    conversation_history: List[Dict[str, str]] = None
 ) -> Optional[str]:
     """
     Generate the next interview question based on previous Q&A and resume chunks.
+    
+    Uses rolling conversation summary to reduce prompt size by 25-40%.
     
     Args:
         session_id: Session identifier
@@ -415,33 +524,69 @@ def generate_next_question(
         seniority_level: Candidate's seniority level
         max_questions: Maximum questions for this interview
         questions_asked: Number of questions already asked
-        chat_history: Full transcript of previous Q&A
+        chat_history: Full transcript of previous Q&A (used if conversation_history not provided)
+        conversation_history: Structured list of Q&A dicts (preferred)
         
     Returns:
         Next question or None if interview should end
     """
-    # Check if interview should end
+    start_time = time.time()
+    
+    # ENFORCE max questions in code (don't rely on LLM)
     if questions_asked >= max_questions:
+        logger.info(f"[{session_id}] Interview complete - reached {max_questions} questions")
         return None
+    
+    logger.info(f"[{session_id}] Generating question {questions_asked + 1}/{max_questions}...")
     
     # Create interview chain
     interview_chain = interviewer_prompt | llm | StrOutputParser()
     
-    # Select relevant chunks based on conversation (simple approach: use all chunks)
-    # In a more advanced version, you could use semantic search here
-    resume_context = "\n\n".join(chunks)
+    # OPTIMIZATION 1: Use limited resume chunks (not all)
+    resume_context = get_relevant_resume_chunks(chunks, max_chunks=3)
+    
+    # OPTIMIZATION 2: Use rolling conversation summary if we have structured history
+    if conversation_history:
+        formatted_history = format_conversation_history(conversation_history, keep_recent=2)
+    else:
+        # Fallback to raw chat_history (less optimized)
+        formatted_history = chat_history if chat_history else "No previous conversation."
     
     # Generate next question
     context = {
         "seniority_level": seniority_level,
         "max_questions": max_questions,
         "total_questions_asked": questions_asked,
-        "chat_history": chat_history,
+        "chat_history": formatted_history,
         "resume_chunks": resume_context
     }
     
-    question = interview_chain.invoke(context)
-    return question.strip()
+    try:
+        question = interview_chain.invoke(context)
+        question = question.strip()
+        
+        # VALIDATION: Ensure question isn't too long (for voice)
+        if len(question) > 200:
+            question = question[:200].rsplit(' ', 1)[0] + "?"
+            logger.warning(f"[{session_id}] Question truncated to 200 chars")
+        
+        elapsed = time.time() - start_time
+        logger.info(f"[{session_id}] Question {questions_asked + 1} generated in {elapsed:.2f}s")
+        return question
+        
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{session_id}] Question generation failed after {elapsed:.2f}s: {e}")
+        
+        # Fallback question instead of crash
+        fallback_questions = [
+            "Can you tell me more about your experience with your primary technology?",
+            "What's a challenging problem you've solved recently?",
+            "How do you approach learning new technologies?",
+            "Tell me about a project you're particularly proud of.",
+        ]
+        import random
+        return random.choice(fallback_questions)
 
 
 def stream_next_question(

@@ -19,7 +19,7 @@ async def get_http_client() -> httpx.AsyncClient:
     global _http_client
     if _http_client is None:
         _http_client = httpx.AsyncClient(
-            timeout=60.0,
+            timeout=30.0,  # Reduced from 60s - LLM should respond in <10s
             # http2=True requires `pip install httpx[http2]` - using HTTP/1.1 for now
             limits=httpx.Limits(
                 max_keepalive_connections=5,
