@@ -150,22 +150,42 @@ class ATSScorer:
         }
     
     def _score_skills(self):
-        """Score skills and keywords (25 points)"""
+        """Score skills and keywords (25 points) - STRICTER VERSION"""
         skills = self.resume_profile.get("skills", [])
         skill_count = len(skills)
         
+        # Cap at 15 skills to avoid inflated scores from keyword stuffing
+        effective_skills = min(skill_count, 15)
+        
         # Also count tech keywords in text
         tech_found = sum(1 for kw in self.TECH_KEYWORDS if kw in self.resume_text)
+        tech_bonus = min(tech_found, 5)  # Max 5 bonus points from tech keywords
         
-        # Score: 2 points per skill, max 25
-        score = min((skill_count * 2) + (tech_found), 25)
+        # Score: 1 point per skill (max 15) + tech bonus (max 5) + relevance bonus (max 5)
+        base_score = effective_skills
         
-        details = [f"✓ {skill_count} skills identified"]
+        # Relevance check: deduct if too many generic skills
+        generic_skills = ["communication", "teamwork", "problem solving", "leadership", "time management"]
+        generic_count = sum(1 for s in skills if s.lower() in generic_skills)
+        
+        # If more than 30% are generic soft skills, reduce score
+        if skill_count > 0 and (generic_count / skill_count) > 0.3:
+            base_score = max(base_score - 3, 0)
+            self.tips.append("Add more technical/specific skills, reduce generic soft skills")
+        
+        score = min(base_score + tech_bonus, 25)
+        
+        details = [f"✓ {skill_count} skills identified (capped at 15 for scoring)"]
         if skill_count < 8:
             self.tips.append("Add more relevant skills (aim for 8-15 skills)")
+        elif skill_count > 20:
+            self.tips.append("Consider focusing on most relevant 15-20 skills")
         
         if tech_found > 0:
             details.append(f"✓ {tech_found} tech keywords found")
+        
+        if generic_count > 3:
+            details.append(f"⚠ {generic_count} generic skills detected")
         
         self.breakdown["skills"] = {
             "score": score,
@@ -175,19 +195,36 @@ class ATSScorer:
         }
     
     def _score_action_verbs(self):
-        """Score action verbs usage (15 points)"""
+        """Score action verbs usage (15 points) - STRICTER VERSION"""
         verbs_found = []
+        verbs_with_context = 0
         
         for verb in self.ACTION_VERBS:
             if verb in self.resume_text:
                 verbs_found.append(verb)
+                # Check if verb is followed by meaningful context (at least 20 chars after)
+                pattern = rf'{verb}\s+\w+.{{15,}}'
+                if re.search(pattern, self.resume_text, re.IGNORECASE):
+                    verbs_with_context += 1
         
-        # Score: 2 points per verb, max 15
-        score = min(len(verbs_found) * 2, 15)
+        # Score: 1 point per verb found, +1 bonus per verb with good context
+        # Harder to max out - need both variety AND context
+        base_score = len(verbs_found)
+        context_bonus = min(verbs_with_context, 5)  # Max 5 bonus for context
         
-        details = [f"✓ Found: {', '.join(verbs_found[:5])}..." if verbs_found else "✗ No action verbs found"]
+        score = min(base_score + context_bonus, 15)
         
-        if len(verbs_found) < 5:
+        if verbs_found:
+            details = [f"✓ Found {len(verbs_found)} action verbs"]
+            if verbs_with_context > 0:
+                details.append(f"✓ {verbs_with_context} verbs with strong context")
+            else:
+                details.append("⚠ Verbs lack detailed context")
+                self.tips.append("Add more context after action verbs (e.g., 'Developed a REST API that...')")
+        else:
+            details = ["✗ No action verbs found"]
+        
+        if len(verbs_found) < 8:
             self.tips.append("Use more action verbs like 'developed', 'managed', 'implemented'")
         
         self.breakdown["action_verbs"] = {
@@ -198,29 +235,49 @@ class ATSScorer:
         }
     
     def _score_quantified_results(self):
-        """Score quantified achievements (15 points)"""
-        patterns = [
-            r'\d+%',           # Percentages: 20%, 150%
-            r'\$[\d,]+',       # Dollar amounts: $50,000
-            r'\d+\+?\s*(years?|months?)',  # Time: 5 years
-            r'\d+\+?\s*(projects?|clients?|users?|customers?)',  # Counts
-            r'increased.*\d+', # Increased by X
-            r'reduced.*\d+',   # Reduced by X
-            r'saved.*\d+',     # Saved X
+        """Score quantified achievements (15 points) - STRICTER VERSION"""
+        
+        # Strong impact patterns (worth more)
+        strong_patterns = [
+            r'increased.*by\s*\d+%',    # "Increased revenue by 25%"
+            r'reduced.*by\s*\d+%',      # "Reduced costs by 30%"
+            r'improved.*by\s*\d+%',     # "Improved efficiency by 40%"
+            r'saved\s*\$[\d,]+',        # "Saved $50,000"
+            r'generated\s*\$[\d,]+',    # "Generated $1M in revenue"
+            r'grew.*\d+%',              # "Grew user base by 150%"
         ]
         
-        matches = []
-        for pattern in patterns:
+        # Weak patterns (worth less - just numbers without impact context)
+        weak_patterns = [
+            r'\d+\+?\s*(years?|months?)',  # Time: 5 years
+            r'\d+\+?\s*(projects?|clients?|users?|customers?|team)',  # Counts
+            r'\d+%',                    # Any percentage without context
+        ]
+        
+        strong_matches = []
+        weak_matches = []
+        
+        for pattern in strong_patterns:
             found = re.findall(pattern, self.resume_text, re.IGNORECASE)
-            matches.extend(found)
+            strong_matches.extend(found)
         
-        # Score: 3 points per quantified result, max 15
-        score = min(len(matches) * 3, 15)
+        for pattern in weak_patterns:
+            found = re.findall(pattern, self.resume_text, re.IGNORECASE)
+            weak_matches.extend(found)
         
-        details = [f"✓ {len(matches)} quantified achievements found"] if matches else ["✗ No quantified results"]
+        # Score: 3 points per strong match, 1 point per weak match
+        score = min((len(strong_matches) * 3) + len(weak_matches), 15)
         
-        if len(matches) < 3:
-            self.tips.append("Add quantified achievements (e.g., 'Increased sales by 25%')")
+        details = []
+        if strong_matches:
+            details.append(f"✓ {len(strong_matches)} strong impact metrics")
+        if weak_matches:
+            details.append(f"✓ {len(weak_matches)} basic quantifications")
+        if not strong_matches and not weak_matches:
+            details.append("✗ No quantified results found")
+        
+        if len(strong_matches) < 3:
+            self.tips.append("Add impact metrics (e.g., 'Increased sales by 25%', 'Saved $10K')")
         
         self.breakdown["quantified"] = {
             "score": score,

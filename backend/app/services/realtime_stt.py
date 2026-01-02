@@ -43,14 +43,14 @@ class RealtimeSTTService:
     
     async def start_streaming(
         self,
-        on_transcript: Callable[[str, bool], None],
+        on_transcript: Callable[[str, bool, bool], None],
         on_error: Optional[Callable[[str], None]] = None
     ):
         """
         Start streaming STT session.
         
         Args:
-            on_transcript: Callback for transcription results (text, is_final)
+            on_transcript: Callback for transcription results (text, is_final, speech_final)
             on_error: Optional callback for errors
         """
         if self.provider == "deepgram":
@@ -58,7 +58,7 @@ class RealtimeSTTService:
     
     async def _start_deepgram_streaming(
         self,
-        on_transcript: Callable[[str, bool], None],
+        on_transcript: Callable[[str, bool, bool], None],
         on_error: Optional[Callable[[str], None]] = None
     ):
         """Start Deepgram streaming connection."""
@@ -69,7 +69,7 @@ class RealtimeSTTService:
                 language="en-US",
                 smart_format=True,
                 interim_results=True,
-                utterance_end_ms="2000",  # Wait 2 seconds of silence before finalizing
+                utterance_end_ms="2000",  # Wait 2 seconds of silence (reduced from 3s for faster response)
                 vad_events=True,
                 encoding="linear16",
                 sample_rate=16000,
@@ -94,11 +94,11 @@ class RealtimeSTTService:
                     
                     print(f"[STT] {'FINAL' if is_final else 'INTERIM'} (speech_final={speech_final}): {sentence}")
                     
-                    # Call the callback - ONLY use is_final to prevent premature finalization
+                    # Call the callback with speech_final info
                     if on_transcript:
                         try:
-                            # Only treat is_final as final, not speech_final
-                            await on_transcript(sentence, is_final)
+                            # Pass is_final and speech_final to properly detect when speech ends
+                            await on_transcript(sentence, is_final, speech_final)
                             print(f"[STT] Callback executed successfully")
                         except Exception as callback_error:
                             print(f"[STT ERROR] Callback failed: {str(callback_error)}")
@@ -129,10 +129,9 @@ class RealtimeSTTService:
             
             async def on_error_event(self_inner, error, **kwargs):
                 try:
-                    error_msg = f"STT Error: {error}"
-                    print(f"[STT ERROR] {error_msg}")
+                    print(f"[STT ERROR] Deepgram error: {error}")
                     if on_error:
-                        await on_error(error_msg)
+                        await on_error(str(error))
                 except Exception as e:
                     print(f"[STT ERROR] on_error_event failed: {str(e)}")
             
@@ -150,58 +149,42 @@ class RealtimeSTTService:
             self.connection.on(LiveTranscriptionEvents.Error, on_error_event)
             self.connection.on(LiveTranscriptionEvents.Close, on_close)
             
-            # Start the connection
-            if not await self.connection.start(options):
-                raise Exception("Failed to start Deepgram connection")
-            
-            print("[STT] Deepgram streaming connection established")
-            
+            # Start connection
+            if await self.connection.start(options):
+                print("[STT] Successfully connected to Deepgram")
+            else:
+                raise Exception("Failed to connect to Deepgram")
+                
         except Exception as e:
-            error_msg = f"Failed to start Deepgram streaming: {str(e)}"
-            print(f"[STT ERROR] {error_msg}")
+            print(f"[STT ERROR] Failed to start Deepgram streaming: {str(e)}")
+            import traceback
+            traceback.print_exc()
             if on_error:
-                await on_error(error_msg)
+                await on_error(str(e))
             raise
     
     async def send_audio(self, audio_data: bytes):
-        """
-        Send audio chunk to STT service.
-        
-        Args:
-            audio_data: Raw audio bytes (linear16, 16kHz, mono)
-        """
+        """Send audio data to the STT service."""
         if not self.connection:
-            raise Exception("STT connection not started")
+            raise Exception("STT connection not established")
         
         try:
-            await self.connection.send(audio_data)  # FIXED: Added await
+            await self.connection.send(audio_data)
         except Exception as e:
             print(f"[STT ERROR] Failed to send audio: {str(e)}")
             raise
     
-    async def stop_streaming(self):
-        """Stop the streaming connection."""
+    async def stop(self):
+        """Stop the STT service and close connection."""
         if self.connection:
             try:
                 await self.connection.finish()
-                print("[STT] Streaming connection stopped")
+                print("[STT] Connection closed successfully")
             except Exception as e:
-                print(f"[STT ERROR] Error stopping connection: {str(e)}")
+                print(f"[STT ERROR] Error closing connection: {str(e)}")
             finally:
                 self.connection = None
     
     def is_connected(self) -> bool:
-        """Check if STT connection is active."""
+        """Check if STT service is connected."""
         return self.connection is not None
-
-
-# Singleton instance
-_stt_service: Optional[RealtimeSTTService] = None
-
-
-def get_stt_service() -> RealtimeSTTService:
-    """Get or create the STT service singleton."""
-    global _stt_service
-    if _stt_service is None:
-        _stt_service = RealtimeSTTService()
-    return _stt_service

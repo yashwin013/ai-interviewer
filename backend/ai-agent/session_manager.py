@@ -136,6 +136,71 @@ class SessionManager:
         """Check if a pre-generated question is available."""
         session = self.get_session(session_id)
         return session.get("pregenerated_question") is not None if session else False
+    
+    # ===== ERROR TRACKING METHODS =====
+    def set_error(self, session_id: str, error: str) -> None:
+        """Store an error in session state for graceful handling."""
+        with self._lock:
+            if session_id in self._sessions:
+                self._sessions[session_id]["last_error"] = {
+                    "message": error,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+    
+    def get_error(self, session_id: str) -> Optional[str]:
+        """Get the last error for a session."""
+        session = self.get_session(session_id)
+        if session and "last_error" in session:
+            return session["last_error"].get("message")
+        return None
+    
+    def clear_error(self, session_id: str) -> None:
+        """Clear the error state for a session."""
+        with self._lock:
+            if session_id in self._sessions and "last_error" in self._sessions[session_id]:
+                del self._sessions[session_id]["last_error"]
+    
+    # ===== QUESTION TOPIC TRACKING (prevent duplicates) =====
+    def add_question_topic(self, session_id: str, question: str) -> None:
+        """Track question topics to prevent repetition."""
+        with self._lock:
+            if session_id in self._sessions:
+                if "question_topics" not in self._sessions[session_id]:
+                    self._sessions[session_id]["question_topics"] = []
+                
+                # Extract key words from question for topic matching
+                topic = self._extract_topic(question)
+                self._sessions[session_id]["question_topics"].append(topic)
+    
+    def is_duplicate_topic(self, session_id: str, question: str) -> bool:
+        """Check if a question covers an already-asked topic."""
+        session = self.get_session(session_id)
+        if not session or "question_topics" not in session:
+            return False
+        
+        new_topic = self._extract_topic(question)
+        existing_topics = session["question_topics"]
+        
+        # Check for significant overlap
+        for existing in existing_topics:
+            overlap = len(set(new_topic) & set(existing))
+            if overlap >= 3:  # 3+ words in common = duplicate
+                return True
+        return False
+    
+    def _extract_topic(self, question: str) -> List[str]:
+        """Extract key topic words from a question."""
+        # Remove common words and punctuation
+        stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 
+                      'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+                      'would', 'could', 'should', 'may', 'might', 'must', 'shall',
+                      'can', 'about', 'your', 'you', 'me', 'tell', 'what', 'how',
+                      'why', 'when', 'where', 'which', 'who', 'with', 'and', 'or',
+                      'to', 'of', 'in', 'for', 'on', 'at', 'by', 'from', 'that',
+                      'this', 'it', 'its', 'more', 'some', 'any', 'most'}
+        
+        words = question.lower().replace('?', '').replace('.', '').split()
+        return [w for w in words if w not in stop_words and len(w) > 2]
 
 
 # Global session manager instance

@@ -1,1 +1,75 @@
 @import "tailwindcss";
+
+:root {
+  /* Dark Theme Colors */
+  --bg-primary: #0d0b1a;
+  --bg-secondary: #1a1033;
+  --bg-card: rgba(26, 22, 51, 0.8);
+  --bg-card-solid: #1a1633;
+  
+  /* Border & Glow */
+  --border-glow-cyan: #00d9ff;
+  --border-glow-purple: #7c3aed;
+  --border-subtle: rgba(0, 217, 255, 0.2);
+  
+  /* Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  
+  /* Accent Colors */
+  --accent-cyan: #00d9ff;
+  --accent-purple: #a855f7;
+  --accent-magenta: #e040fb;
+  --accent-pink: #ec4899;
+}
+
+/* Global Dark Background */
+body {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  min-height: 100vh;
+}
+
+/* Glassmorphism Card */
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+}
+
+/* Glowing Border Animation */
+.glow-border {
+  position: relative;
+}
+
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--border-glow-cyan), var(--border-glow-purple));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Button Glow Effect */
+.btn-glow {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.6);
+}
