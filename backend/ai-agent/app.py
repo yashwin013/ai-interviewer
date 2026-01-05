@@ -149,7 +149,7 @@ def format_conversation_history(history: List[Dict[str, str]], keep_recent: int 
     Format conversation history with rolling summary to reduce prompt size.
     Keeps recent Q&A verbatim, summarizes older exchanges.
     
-    This reduces prompt tokens by ~25-40% after 3+ questions.
+    This reduces prompt tokens by ~25-40% after 2 questions(for now).
     
     Args:
         history: List of {"question": str, "answer": str} dicts
@@ -250,7 +250,7 @@ EXTRACTION RULES:
 1. If a field cannot be found, use "unknown" for strings or [] for arrays
 2. Normalize email to lowercase
 3. For LinkedIn: extract URL or just the username/profile path
-4. For skills: extract TECHNICAL skills only, limit to top 15 most relevant
+4. For skills: Try to extract all skills, but adhere to the limit of top 15 most relevant
 5. Determine seniority_level based on years of experience:
    - 0-1 years experience: "Fresher"
    - 1-3 years experience: "Junior"
@@ -382,9 +382,13 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     INSTRUCTION:
     Generate ONLY the next question.
     Make it conversational and natural for voice.
-    Avoid repeating previous topics.
-    Reference the candidate's resume when relevant.
-    Keep it under 25 words.
+    Avoid repeating previous topics unless a concise follow-up is required to clarify or deepen an earlier answer.
+    Use the candidate's previous responses to adapt your next question:
+    - If the last answer was brief or unclear, ask a short clarifying follow-up requesting a specific example or detail. Question can be "I want to ask a clarifying question", "Let me gather more information on your last response", "Can you Elaborate on that?",etc.
+    - Only ask clarifying questions upto a maximum of 2 times for a particular question.
+    - Whenever you ask a clarifying question, make sure it is not included in the main question count.
+    - If the last answer was strong and detailed, move to a related but new area or raise the difficulty appropriately.
+    Reference the candidate's resume when relevant and keep the question focused and under 25 words.
     """)
 ])
 
@@ -551,13 +555,29 @@ def generate_next_question(
     else:
         # Fallback to raw chat_history (less optimized)
         formatted_history = chat_history if chat_history else "No previous conversation."
-    
+
+    # Also provide the most recent Q/A explicitly so the model can focus follow-ups
+    try:
+        conv_full = session_manager.get_conversation_history(session_id)
+    except Exception:
+        conv_full = None
+
+    if conv_full and len(conv_full) > 0:
+        last_qa = conv_full[-1]
+        last_question = last_qa.get("question", "")
+        last_answer = last_qa.get("answer", "") or ""
+    else:
+        last_question = ""
+        last_answer = ""
+
     # Generate next question
     context = {
         "seniority_level": seniority_level,
         "max_questions": max_questions,
         "total_questions_asked": questions_asked,
         "chat_history": formatted_history,
+        "last_question": last_question,
+        "last_answer": last_answer,
         "resume_chunks": resume_context
     }
     
