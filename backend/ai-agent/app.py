@@ -94,6 +94,7 @@ class NextQuestionResponse(BaseModel):
     nextQuestion: Optional[str]
     isComplete: bool = False  # True when interview is finished
     closingMessage: Optional[str] = None  # Farewell message when interview ends
+    isRepeat: bool = False  # True if question is a repeat due to clarifying
 
 
 class InterviewAssessment(BaseModel):
@@ -263,6 +264,34 @@ def get_relevant_resume_chunks(chunks: List[str], max_chunks: int = 3) -> str:
         return result
     
     return "\n\n".join(relevant)
+
+def is_repeat_request(text: Optional[str]) -> bool:
+    """
+    Heuristic to detect if the user's reply requests the agent to repeat the current question.
+    Returns True for phrases like "repeat", "can you repeat", "say that again", etc.
+    """
+    if not text:
+        return False
+    import re
+    t = text.strip().lower()
+    patterns = [
+        r"\brepeat\b",
+        r"say that again",
+        r"can you repeat",
+        r"could you repeat",
+        r"one more time",
+        r"please repeat",
+        r"again please",
+        r"what was the question",
+        r"what is the question",
+        r"repeat the question",
+    ]
+    for p in patterns:
+        if re.search(p, t):
+            return True
+    return False
+
+
 
 
 def parse_resume_from_chunks(resume_text: str, chunks: List[str]) -> Dict[str, Any]:
@@ -886,6 +915,16 @@ async def next_question(request: NextQuestionRequest):
         # Update conversation with the answer to current question
         # Use update_answer_only which correctly handles clarifying questions
         conversation = session_manager.get_conversation_history(request.sessionId)
+        # If the user asked to repeat the current question, do NOT store this as the answer
+        # and simply return the current question unchanged (do not increment question count).
+        if conversation and len(conversation) > 0 and is_repeat_request(request.currentAnswer):
+            last_qa = conversation[-1]
+            repeat_q = last_qa.get("question") or ""
+            prefix = "Sure, I will repeat the question: "
+            print(f"[REPEAT] User requested repeat. Re-sending last question for session {request.sessionId}")
+            return NextQuestionResponse(nextQuestion=f"{prefix}{repeat_q}", isRepeat=True)
+
+        # Normal flow: record the candidate's answer for the last question if missing
         if conversation and len(conversation) > 0:
             last_qa = conversation[-1]
             if last_qa.get("answer") is None:
@@ -1058,6 +1097,33 @@ async def next_question_stream(request: NextQuestionRequest):
     
     # Update conversation with answer
     conversation = session_manager.get_conversation_history(request.sessionId)
+    # If user asked to repeat, stream the last question again and do not record an answer
+    if conversation and len(conversation) > 0 and is_repeat_request(request.currentAnswer):
+        last_qa = conversation[-1]
+        repeat_q = last_qa.get("question", "") or ""
+        # Stream the repeat as small chunks for SSE clients, with a spoken prefix
+        prefix = "Sure, I will repeat the question: "
+        full_text = f"{prefix}{repeat_q}"
+        def repeat_generator():
+            # Yield small chunks for better streaming behavior
+            q = full_text
+            chunk_size = 50
+            for i in range(0, len(q), chunk_size):
+                chunk = q[i:i+chunk_size]
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+
+            yield f"data: {json.dumps({'done': True, 'fullQuestion': full_text.strip(), 'isRepeat': True})}\n\n"
+
+        return StreamingResponse(
+            repeat_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+
+    # Normal flow: record the candidate's answer for the last question if missing
     if conversation and len(conversation) > 0:
         last_qa = conversation[-1]
         if last_qa.get("answer") is None:
