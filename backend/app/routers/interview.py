@@ -122,6 +122,25 @@ async def submit_answer(sessionId: str, payload: AnswerRequest):
     if not resume_profile:
         raise HTTPException(status_code=400, detail="Missing resume profile.")
 
+    # Check if user is asking to repeat the question
+    repeat_keywords = ["repeat", "ask again", "say it again", "repeat question", "repeat the question", "ask the question again"]
+    user_input_lower = payload.answer.lower().strip()
+    is_repeat_request = any(keyword in user_input_lower for keyword in repeat_keywords)
+
+    if is_repeat_request:
+        # Fetch the current question from database
+        current_qa = await db.interview_answers.find_one(
+            {"sessionId": sessionId, "questionNumber": payload.questionNumber}
+        )
+        
+        if current_qa and current_qa.get("question"):
+            # Return the current question without saving the repeat request as an answer
+            return AnswerResponse(
+                nextQuestion=current_qa.get("question"),
+                nextQuestionNumber=payload.questionNumber,
+                message="Question repeated."
+            )
+
     result = await db.interview_answers.update_one(
         {"sessionId": sessionId, "questionNumber": payload.questionNumber},
         {

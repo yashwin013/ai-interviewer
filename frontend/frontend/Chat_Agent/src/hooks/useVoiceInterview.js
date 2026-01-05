@@ -75,6 +75,10 @@ export const useVoiceInterview = (sessionId) => {
             
             case 'complete':
               console.log('[VOICE] Interview complete');
+              // Speak the closing message before ending
+              if (message.closingMessage) {
+                speakText(message.closingMessage);
+              }
               setIsComplete(true);
               setAssessment(message.assessment);
               stopRecording();

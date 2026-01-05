@@ -14,38 +14,38 @@ const JobApplicationSuccess = ({ userEmail, onLogout }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-[#0d0b1a]">
       <Header userEmail={userEmail} onLogout={onLogout} />
       
-      <div className="flex pt-[138px]">
+      <div className="flex pt-[72px]">
         <Sidebar />
         
         <main className="flex-1 p-8">
           <div className="max-w-4xl mx-auto">
             {/* Success Message */}
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-12 border border-white/50 text-center mb-6">
+            <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-12 border border-[rgba(0,217,255,0.15)] text-center mb-6">
               {/* Success Icon */}
-              <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+              <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
                 <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
 
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-4">
                 🎉 Congratulations!
               </h1>
-              <p className="text-2xl text-gray-700 font-semibold mb-2">
+              <p className="text-2xl text-white font-semibold mb-2">
                 Application Submitted Successfully
               </p>
-              <p className="text-gray-600 text-lg">
+              <p className="text-white/60 text-lg">
                 Your application has been sent to the employer
               </p>
             </div>
 
             {/* Job Details */}
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/50 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 border border-[rgba(0,217,255,0.15)] mb-6">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
                 Applied Position
@@ -53,11 +53,11 @@ const JobApplicationSuccess = ({ userEmail, onLogout }) => {
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-800">{job.title}</h3>
-                  <p className="text-xl text-gray-600 font-medium mt-1">{job.company}</p>
+                  <h3 className="text-2xl font-bold text-white">{job.title}</h3>
+                  <p className="text-xl text-white/70 font-medium mt-1">{job.company}</p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-gray-600 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap items-center gap-4 text-white/60 pt-4 border-t border-white/10">
                   {job.location && (
                     <span className="flex items-center gap-2">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,11 +86,11 @@ const JobApplicationSuccess = ({ userEmail, onLogout }) => {
                 </div>
 
                 {job.skills && job.skills.length > 0 && (
-                  <div className="pt-4 border-t border-gray-200">
-                    <p className="text-sm font-semibold text-gray-700 mb-3">Required Skills:</p>
+                  <div className="pt-4 border-t border-white/10">
+                    <p className="text-sm font-semibold text-white/70 mb-3">Required Skills:</p>
                     <div className="flex flex-wrap gap-2">
                       {job.skills.map((skill, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
+                        <span key={idx} className="px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm font-medium">
                           {skill}
                         </span>
                       ))}
@@ -101,7 +101,7 @@ const JobApplicationSuccess = ({ userEmail, onLogout }) => {
             </div>
 
             {/* Interview Preparation CTA */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-white">
+            <div className="bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-2xl shadow-lg shadow-purple-900/30 p-8 text-white">
               <div className="flex items-start gap-6">
                 <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@ const JobApplicationSuccess = ({ userEmail, onLogout }) => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold mb-2">Prepare for Your Interview!</h3>
-                  <p className="text-purple-100 mb-6">
+                  <p className="text-white/80 mb-6">
                     Increase your chances of success by practicing with our AI-powered mock interview tailored to this position.
                   </p>
                   <div className="flex gap-4">
@@ -132,34 +132,34 @@ const JobApplicationSuccess = ({ userEmail, onLogout }) => {
             </div>
 
             {/* Next Steps */}
-            <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/50 mt-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">What Happens Next?</h3>
+            <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 border border-[rgba(0,217,255,0.15)] mt-6">
+              <h3 className="text-xl font-bold text-white mb-4">What Happens Next?</h3>
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-purple-600 font-bold">1</span>
+                  <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <span className="text-purple-400 font-bold">1</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-800">Application Review</p>
-                    <p className="text-gray-600 text-sm">The employer will review your application and resume</p>
+                    <p className="font-semibold text-white">Application Review</p>
+                    <p className="text-white/60 text-sm">The employer will review your application and resume</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-blue-600 font-bold">2</span>
+                  <div className="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <span className="text-cyan-400 font-bold">2</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-800">Interview Invitation</p>
-                    <p className="text-gray-600 text-sm">If selected, you'll receive an interview invitation via email</p>
+                    <p className="font-semibold text-white">Interview Invitation</p>
+                    <p className="text-white/60 text-sm">If selected, you'll receive an interview invitation via email</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-green-600 font-bold">3</span>
+                  <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <span className="text-green-400 font-bold">3</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-800">Prepare & Succeed</p>
-                    <p className="text-gray-600 text-sm">Use our mock interviews to prepare and ace your interview</p>
+                    <p className="font-semibold text-white">Prepare & Succeed</p>
+                    <p className="text-white/60 text-sm">Use our mock interviews to prepare and ace your interview</p>
                   </div>
                 </div>
               </div>

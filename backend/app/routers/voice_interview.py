@@ -57,11 +57,12 @@ async def voice_interview_websocket(websocket: WebSocket, session_id: str):
                 "questionNumber": question_number
             })
         
-        async def on_interview_complete(assessment: dict):
+        async def on_interview_complete(assessment: dict, closing_message: str = None):
             """Send completion message with assessment."""
             await websocket.send_json({
                 "type": "complete",
-                "assessment": assessment
+                "assessment": assessment,
+                "closingMessage": closing_message or "Thank you so much! That concludes our interview. You did a great job, and I really enjoyed our conversation. We'll be in touch soon with your results. Best of luck!"
             })
         
         async def on_error(error_msg: str):
@@ -132,7 +133,8 @@ async def voice_interview_websocket(websocket: WebSocket, session_id: str):
                             
                             await websocket.send_json({
                                 "type": "complete",
-                                "assessment": assessment
+                                "assessment": assessment,
+                                "closingMessage": "Thank you for your time! The interview has been ended early. We'll still generate your assessment based on the questions answered. Best of luck!"
                             })
                             print(f"[WEBSOCKET] Assessment sent for early end")
                         except Exception as e:

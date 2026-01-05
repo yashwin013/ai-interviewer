@@ -54,10 +54,60 @@ class SessionManager:
                 self._sessions[session_id]["conversation_history"].append({
                     "question": question,
                     "answer": answer,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "is_clarifying": False  # Regular question
                 })
                 if answer:  # Only increment when answer is provided
                     self._sessions[session_id]["questions_asked"] += 1
+                self._sessions[session_id]["last_accessed"] = datetime.utcnow()
+    
+    def add_clarifying_question(
+        self, 
+        session_id: str, 
+        question: str
+    ) -> None:
+        """
+        Add a clarifying question to conversation history WITHOUT incrementing the counter.
+        Used for follow-up questions when candidate gives vague/skip answers.
+        """
+        with self._lock:
+            if session_id in self._sessions:
+                self._sessions[session_id]["conversation_history"].append({
+                    "question": question,
+                    "answer": None,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "is_clarifying": True  # Clarifying question - doesn't count
+                })
+                self._sessions[session_id]["last_accessed"] = datetime.utcnow()
+                print(f"[CLARIFY] Added clarifying question for session {session_id} (NOT counted)")
+    
+    def update_answer_only(
+        self, 
+        session_id: str, 
+        answer: str
+    ) -> None:
+        """
+        Update only the answer of the last unanswered question WITHOUT incrementing the counter.
+        Used for clarifying questions where we don't want to count toward the quota.
+        
+        Args:
+            session_id: The session identifier
+            answer: The candidate's answer
+        """
+        with self._lock:
+            if session_id in self._sessions:
+                history = self._sessions[session_id]["conversation_history"]
+                # Find the last question without an answer
+                for i in range(len(history) - 1, -1, -1):
+                    if history[i].get("answer") is None:
+                        history[i]["answer"] = answer
+                        was_clarifying = history[i].get("is_clarifying", False)
+                        if was_clarifying:
+                            print(f"[CLARIFY] Updated answer for clarifying question (NOT counted)")
+                        else:
+                            # If it wasn't a clarifying question, increment the counter
+                            self._sessions[session_id]["questions_asked"] += 1
+                        break
                 self._sessions[session_id]["last_accessed"] = datetime.utcnow()
     
     def get_conversation_history(self, session_id: str) -> List[Dict[str, str]]:

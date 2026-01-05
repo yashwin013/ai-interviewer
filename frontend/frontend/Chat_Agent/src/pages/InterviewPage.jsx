@@ -247,14 +247,16 @@ const InterviewPage = () => {
         await speakText(response.nextQuestion);
         setCurrentQuestionNumber(response.nextQuestionNumber);
       } else {
-        const finalMsg =
-          response.message ||
-          "Thank you! The interview has been completed.";
+      // Interview complete - use closing message from API
+      const finalMsg =
+        response.closingMessage ||
+        response.message ||
+        "Thank you! The interview has been completed.";
 
-        setMessages((prev) => [...prev, { sender: "ai", text: finalMsg }]);
-        await speakText(finalMsg);
-        setInterviewEnded(true);
-      }
+      setMessages((prev) => [...prev, { sender: "ai", text: finalMsg }]);
+      await speakText(finalMsg);
+      setInterviewEnded(true);
+    }
     } catch (err) {
       console.error("Submit answer error:", err);
       setMessages((prev) => [

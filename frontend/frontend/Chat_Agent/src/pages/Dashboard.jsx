@@ -220,7 +220,7 @@ const Dashboard = ({ userEmail, onLogout }) => {
             </div>
 
             {/* Action Buttons Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {/* Start New Interview Button */}
               <button
                 onClick={handleStartInterview}
@@ -243,19 +243,6 @@ const Dashboard = ({ userEmail, onLogout }) => {
                 <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center group-hover:translate-x-1 transition">
                   <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
-
-              {/* Voice Interview Button */}
-              <button
-                onClick={() => navigate('/voice-interview')}
-                className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-5 border border-[rgba(0,217,255,0.15)] hover:border-cyan-500/50 transition-all group flex items-center justify-between"
-              >
-                <span className="text-lg font-bold text-white">Voice Interview</span>
-                <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center group-hover:translate-x-1 transition">
-                  <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
                 </div>
               </button>
