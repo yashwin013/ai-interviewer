@@ -14,6 +14,9 @@ import logging
 import time
 from dotenv import load_dotenv
 
+import sqlite3
+from memori import Memori
+
 # Configure structured logging
 logging.basicConfig(
     level=logging.INFO,
@@ -28,11 +31,26 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import OpenAIEmbeddings
 
+# OpenAI native client for Memori integration
+from openai import OpenAI
+
 # Session manager
 from session_manager import session_manager
 
 # Load environment variables
 load_dotenv()
+
+# ==================== Memori Setup ====================
+from pymongo import MongoClient
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from app.config import settings
+
+def get_memori_db():
+    client = MongoClient(settings.MONGO_URI, tlsAllowInvalidCertificates=True)
+    return client.get_database("memori_interviews")
+
+
 
 app = FastAPI(
     title="AI Interview Agent",
@@ -121,15 +139,129 @@ class GenerateAssessmentResponse(BaseModel):
 
 # ==================== Global LLM Setup ====================
 
-# Initialize OpenAI models
+# Initialize Memori memory layer with OpenAI client registration FIRST
+# This must happen before creating LangChain models so they can use the registered client
+openai_client = None
+memori = None
+
+try:
+    # Create native OpenAI client for Memori to track
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    # Initialize Memori with MongoDB connection
+    # Memori automatically picks up MEMORI_API_KEY from environment variables
+    memori = Memori(conn=get_memori_db)
+    
+    # Build storage schema (creates collections if not exist)
+    memori.config.storage.build()
+    
+    # Register the OpenAI client with Memori for automatic conversation tracking
+    # This enables Memori to intercept LLM calls and store conversations, facts, etc.
+    memori.llm.register(openai_client)
+    
+    logger.info("Memori memory layer initialized and OpenAI client registered successfully")
+except Exception as e:
+    logger.warning(f"Memori initialization failed: {e}. Continuing without memory layer.")
+    memori = None
+    # If Memori fails, still create a regular OpenAI client
+    if openai_client is None:
+        openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Note: LangChain ChatOpenAI creates its own internal client
+# Memori will track calls made through the registered openai_client directly
 llm = ChatOpenAI(
-    model="gpt-4o-mini",  # OpenAI GPT-4o model
+    model="gpt-4o-mini",
     temperature=0.7,
     api_key=os.getenv("OPENAI_API_KEY")
 )
 
 # Note: Embeddings not needed for current implementation, but keeping for future use
 embeddings = OpenAIEmbeddings() if os.getenv("OPENAI_API_KEY") else None
+
+
+# ==================== Memori Storage Helper ====================
+
+def store_memory_via_llm(entity_id: str, memory_text: str, async_store: bool = True):
+    """
+    Store a memory by making a simple OpenAI call that Memori can intercept.
+    This triggers Memori's Advanced Augmentation to extract facts.
+    
+    Args:
+        entity_id: Usually the session ID to attribute the memory to
+        memory_text: The text containing facts to store
+        async_store: If True, run in background thread to avoid blocking
+    """
+    if not memori or not openai_client:
+        logger.debug("Memori not available, skipping memory storage")
+        return
+    
+    def _store():
+        try:
+            memori.attribution(entity_id=entity_id, process_id="mock-interviewer")
+            # Make a simple completion that Memori will intercept and extract facts from
+            openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a memory storage assistant. Acknowledge the information provided."},
+                    {"role": "user", "content": memory_text}
+                ],
+                max_tokens=50  # Keep response short since we don't need it
+            )
+            logger.info(f"[MEMORI] Stored memory for entity {entity_id[:20]}...")
+        except Exception as e:
+            logger.warning(f"[MEMORI] Failed to store memory: {e}")
+    
+    if async_store:
+        import threading
+        thread = threading.Thread(target=_store, daemon=True)
+        thread.start()
+    else:
+        _store()
+
+
+def recall_memories(entity_id: str, query: str, limit: int = 5) -> str:
+    """
+    Recall relevant facts from Memori using semantic search.
+    Returns formatted string of memories to inject into prompts.
+    
+    Args:
+        entity_id: The entity (session/user) to recall memories for
+        query: Search query for semantic matching
+        limit: Maximum number of facts to retrieve
+        
+    Returns:
+        Formatted string of relevant memories, or empty string if none found
+    """
+    if not memori:
+        return ""
+    
+    try:
+        memori.attribution(entity_id=entity_id, process_id="mock-interviewer")
+        facts = memori.recall(query, limit=limit)
+        
+        if not facts:
+            logger.debug(f"[MEMORI] No memories found for query: {query[:50]}...")
+            return ""
+        
+        # Filter by similarity threshold and format
+        memories = []
+        for fact in facts:
+            similarity = fact.get('similarity', 0)
+            content = fact.get('content', '')
+            
+            # Only include facts with reasonable similarity
+            if similarity > 0.25 and content:
+                memories.append(f"• {content[:200]}")  # Limit length per fact
+        
+        if memories:
+            logger.info(f"[MEMORI] Recalled {len(memories)} relevant facts for entity {entity_id[:20]}...")
+            return "\n".join(memories[:5])  # Cap at 5 memories
+        
+        return ""
+        
+    except Exception as e:
+        logger.warning(f"[MEMORI] Recall failed: {e}")
+        return ""
 
 
 # ==================== Helper Functions ====================
@@ -396,6 +528,15 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     - Seniority Level: {seniority_level}
     - Resume Context: {resume_chunks}
     
+    RECALLED MEMORIES (facts from earlier in this interview or previous sessions):
+    {recalled_memories}
+    
+    USE RECALLED MEMORIES TO:
+    - Reference specific things the candidate mentioned earlier
+    - Build on their stated skills, experiences, or preferences
+    - Create continuity by connecting new questions to previous answers
+    - Show active listening by acknowledging what they've shared
+    
     YOUR PERSONALITY:
     - Warm and encouraging, never intimidating
     - Professional but conversational
@@ -431,21 +572,21 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     - If candidate asks to repeat or clarify a question you asked, rephrase it slightly instead of repeating verbatim.
     
     CLARIFYING QUESTIONS (IMPORTANT):
-    When the candidate gives ANY of these types of answers, you MUST ask a clarifying follow-up:
-    - "skip", "pass", "next question", "I don't know", "not sure"
+    When the candidate gives ANY of these types of answers, you MUST ask a clarifying follow-up question just once:
     - One-word answers (e.g., "yes", "no", "maybe")
-    - Very short/vague answers (under 10 words)
+    - Very short/vague answers (under 5 words)
     - Off-topic or unclear responses
     
     For clarifying questions:
     - PREFIX your question with [CLARIFY] tag (e.g., "[CLARIFY] Could you give me a specific example?")
-    - Ask at most 2 clarifying follow-ups per original question
+    - Ask at most 1 clarifying follow-up per original question
     - Keep clarifying questions short and encouraging
     - Examples: "[CLARIFY] Let me rephrase that - can you share a specific example?"
                 "[CLARIFY] I'd love to hear more. What was your approach?"
                 "[CLARIFY] No worries! How about we try a simpler version - have you worked with...?"
     
     CRITICAL RULES:
+    - Strictly adhere to the question variety rules given to you. The interview must contain questions from all areas mentioned under "QUESTION VARIETY" section, with Technical and Experience-based questions making up the majority of the interview.
     - First question (when total_questions_asked == 0) MUST be an introductory question:
         * "Tell me about yourself and your background."
         * "Walk me through your experience."
@@ -455,7 +596,7 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
             *"Great to meet you, {candidate_first_name}. Let's dive into..."
             *"Nice to hear that, {candidate_first_name}. Could you tell me more about..."
 
-    - Never repeat questions
+    - Never repeat questions unless it's a clarifying follow-up
     - Reference specific items from their resume when possible
     - Ask open-ended questions that encourage detailed answers
     - Keep questions conversational and natural for voice
@@ -475,13 +616,13 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     Avoid repeating previous topics unless a concise follow-up is required to clarify or deepen an earlier answer.
     
     ANALYZING THE LAST ANSWER:
-    - If the last answer was "skip", "pass", "I don't know", or similar → Ask a [CLARIFY] question to probe gently or rephrase
-    - If the last answer was very brief (under 10 words) → Ask a [CLARIFY] question for elaboration
+    - If the last question was [CLARIFY] and the answer is still brief/vague → Move to a new topic (NO [CLARIFY] tag)
+    - If the last answer was very brief (under 5 words) → Ask a [CLARIFY] question for elaboration
     - If the last answer was strong and detailed → Move to a new topic (NO [CLARIFY] tag)
     
     REMEMBER: 
     - [CLARIFY] questions do NOT count toward the main question count
-    - Maximum 2 clarifying follow-ups per original question
+    - Maximum 1 clarifying follow-ups per original question
     - Keep questions under 25 words
     """)
 ])
@@ -560,7 +701,7 @@ assessment_prompt = ChatPromptTemplate.from_messages([
 ])
 
 
-def generate_first_question(session_id: str, chunks: List[str], seniority_level: str, max_questions: int) -> str:
+def generate_first_question(session_id: str, chunks: List[str], seniority_level: str, max_questions: int, candidate_first_name: str = "Candidate") -> str:
     """
     Generate the first interview question based on candidate profile and resume chunks.
     
@@ -582,13 +723,22 @@ def generate_first_question(session_id: str, chunks: List[str], seniority_level:
     # Use optimized resume context (limited chunks to reduce tokens)
     resume_context = get_relevant_resume_chunks(chunks, max_chunks=3)
     
+    # Recall relevant memories for first question
+    recalled = recall_memories(
+        entity_id=session_id,
+        query=f"candidate profile background skills {seniority_level}",
+        limit=3
+    )
+
     # Generate first question
     context = {
         "seniority_level": seniority_level,
         "max_questions": max_questions,
         "total_questions_asked": 0,
         "chat_history": "No previous conversation.",
-        "resume_chunks": resume_context
+        "resume_chunks": resume_context,
+        "candidate_first_name": candidate_first_name,
+        "recalled_memories": recalled if recalled else "No previous memories."
     }
     
     try:
@@ -609,7 +759,8 @@ def generate_next_question(
     max_questions: int,
     questions_asked: int,
     chat_history: str,
-    conversation_history: List[Dict[str, str]] = None
+    conversation_history: List[Dict[str, str]] = None,
+    candidate_first_name: str = "Candidate"
 ) -> Optional[str]:
     """
     Generate the next interview question based on previous Q&A and resume chunks.
@@ -664,6 +815,15 @@ def generate_next_question(
         last_question = ""
         last_answer = ""
 
+    # Recall relevant memories based on current context
+    # We query for skills/experience related to the last answer or general seniority
+    query_text = f"{seniority_level} skills experience {last_answer[:50]}"
+    recalled = recall_memories(
+        entity_id=session_id,
+        query=query_text,
+        limit=5
+    )
+
     # Generate next question
     context = {
         "seniority_level": seniority_level,
@@ -672,7 +832,9 @@ def generate_next_question(
         "chat_history": formatted_history,
         "last_question": last_question,
         "last_answer": last_answer,
-        "resume_chunks": resume_context
+        "resume_chunks": resume_context,
+        "candidate_first_name": candidate_first_name,
+        "recalled_memories": recalled if recalled else "No previous memories."
     }
     
     try:
@@ -796,6 +958,12 @@ async def init_interview(request: InitInterviewRequest):
     
     try:
         print(f"[DEBUG] Initializing interview for session: {request.sessionId}")
+
+        if memori:
+            memori.attribution(
+                entity_id=request.sessionId,
+                process_id="mock-interviewer"
+            )
         
         # ===== INSTANT INTRO QUESTION =====
         # This requires NO LLM call - returns immediately!
@@ -872,13 +1040,26 @@ async def generate_first_question_background(session_id: str, resume_text: str, 
             session["max_questions"] = max_questions
             print(f"[BACKGROUND] Session updated with profile: {resume_profile.get('seniority_level')}")
         
+        # Store candidate profile in Memori
+        skills_str = ', '.join(resume_profile.get('skills', [])[:10])  # Limit to 10 skills for memory
+        memory_text = f"""
+Candidate Profile for Interview:
+- Name: {resume_profile.get('name', 'Unknown')}
+- Email: {resume_profile.get('email', 'Unknown')}
+- Seniority Level: {resume_profile.get('seniority_level', 'Unknown')}
+- Key Skills: {skills_str}
+- Experience Summary: {resume_profile.get('experience', 'No experience available')[:500]}
+"""
+        store_memory_via_llm(entity_id=session_id, memory_text=memory_text)
+        
         # Generate first real question (takes ~1-2 seconds)
         print(f"[BACKGROUND] Generating first real question...")
         first_question = generate_first_question(
             session_id=session_id,
             chunks=chunks,
             seniority_level=resume_profile['seniority_level'],
-            max_questions=max_questions
+            max_questions=max_questions,
+            candidate_first_name=resume_profile.get('candidate_first_name', 'Candidate')
         )
         
         # Store as pre-generated question (will be used when user finishes intro)
@@ -906,6 +1087,12 @@ async def next_question(request: NextQuestionRequest):
     try:
         start_time = time.time()
         print(f"[DEBUG] Generating next question for session: {request.sessionId}")
+
+        if memori:
+            memori.attribution(
+                entity_id=request.sessionId,
+                process_id="mock-interviewer"
+            )
         
         # Get session data
         session = session_manager.get_session(request.sessionId)
@@ -923,7 +1110,7 @@ async def next_question(request: NextQuestionRequest):
             prefix = "Sure, I will repeat the question: "
             print(f"[REPEAT] User requested repeat. Re-sending last question for session {request.sessionId}")
             return NextQuestionResponse(nextQuestion=f"{prefix}{repeat_q}", isRepeat=True)
-
+        
         # Normal flow: record the candidate's answer for the last question if missing
         if conversation and len(conversation) > 0:
             last_qa = conversation[-1]
@@ -933,6 +1120,15 @@ async def next_question(request: NextQuestionRequest):
                     session_id=request.sessionId,
                     answer=request.currentAnswer
                 )
+                
+                # Store Q&A exchange in Memori
+                last_question = last_qa.get("question", "Unknown question")
+                memory_text = f"""
+Interview Q&A Exchange:
+Question: {last_question[:500]}
+Candidate's Answer: {request.currentAnswer[:1000]}
+"""
+                store_memory_via_llm(entity_id=request.sessionId, memory_text=memory_text)
         
         # Check for pre-generated question (instant response!)
         pregenerated = session_manager.get_pregenerated_question(request.sessionId)
@@ -975,7 +1171,8 @@ async def next_question(request: NextQuestionRequest):
                 seniority_level=resume_profile['seniority_level'],
                 max_questions=max_questions,
                 questions_asked=questions_asked,
-                chat_history=chat_history
+                chat_history=chat_history,
+                candidate_first_name=resume_profile.get('candidate_first_name', 'Candidate')
             )
             elapsed = time.time() - start_time
             print(f"[DEBUG] Generated question normally in {elapsed:.2f}s")
@@ -984,10 +1181,25 @@ async def next_question(request: NextQuestionRequest):
             # Check if this is a clarifying question (shouldn't count toward quota)
             is_clarify = is_clarifying_question(next_q)
             
+            # Count consecutive clarifying questions to prevent infinite loop
+            conversation = session_manager.get_conversation_history(request.sessionId)
+            consecutive_clarify = 0
+            for qa in reversed(conversation):
+                if qa.get("is_clarifying", False):
+                    consecutive_clarify += 1
+                else:
+                    break
+            
+            # Force regular question after 2 consecutive clarifying questions
+            MAX_CONSECUTIVE_CLARIFY = 2
+            if is_clarify and consecutive_clarify >= MAX_CONSECUTIVE_CLARIFY:
+                print(f"[CLARIFY] Hit max consecutive clarify limit ({MAX_CONSECUTIVE_CLARIFY}). Treating as regular question.")
+                is_clarify = False
+            
             if is_clarify:
                 # Strip the [CLARIFY] tag before storing/returning
                 next_q = strip_clarify_tag(next_q)
-                print(f"[CLARIFY] Detected clarifying question - will NOT count toward quota")
+                print(f"[CLARIFY] Detected clarifying question ({consecutive_clarify + 1}/{MAX_CONSECUTIVE_CLARIFY}) - will NOT count toward quota")
                 
                 # Store clarifying question WITHOUT incrementing counter
                 # We store it directly in session without using update_conversation's increment
@@ -997,6 +1209,8 @@ async def next_question(request: NextQuestionRequest):
                 )
             else:
                 # Regular question - store normally (will increment counter when answered)
+                # Strip [CLARIFY] tag if present (in case we forced it to be regular)
+                next_q = strip_clarify_tag(next_q)
                 session_manager.update_conversation(
                     session_id=request.sessionId,
                     question=next_q,
@@ -1070,7 +1284,8 @@ async def pregenerate_next_question_background(session_id: str):
             seniority_level=resume_profile['seniority_level'],
             max_questions=max_questions,
             questions_asked=questions_asked + 1,  # For the NEXT question
-            chat_history=chat_history
+            chat_history=chat_history,
+            candidate_first_name=resume_profile.get('candidate_first_name', 'Candidate')
         )
         
         if pregenerated_question:
@@ -1192,6 +1407,12 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
     """
     try:
         print(f"[DEBUG] Generating assessment for session: {request.sessionId}")
+
+        if memori:
+            memori.attribution(
+                entity_id=request.sessionId,
+                process_id="mock-interviewer"
+            )
         
         # Create structured LLM for assessment
         structured_assessor = llm.with_structured_output(InterviewAssessment)
@@ -1238,6 +1459,19 @@ async def generate_assessment_endpoint(request: GenerateAssessmentRequest):
         print(f"[DEBUG] Assessment generated successfully")
         print(f"[DEBUG] Score: {assessment_dict['candidate_score_percent']}/100")
         print(f"[DEBUG] Recommendation: {assessment_dict['hiring_recommendation']}")
+        
+        # Store assessment results in Memori
+        strengths_str = ', '.join(assessment_dict.get('strengths', [])[:5])
+        weaknesses_str = ', '.join(assessment_dict.get('weaknesses', [])[:5])
+        memory_text = f"""
+Interview Assessment Results:
+- Candidate Score: {assessment_dict['candidate_score_percent']}%
+- Hiring Recommendation: {assessment_dict['hiring_recommendation']}
+- Key Strengths: {strengths_str}
+- Areas for Improvement: {weaknesses_str}
+- Assessment Summary: {assessment_dict.get('answer_quality_analysis', 'No summary available')[:500]}
+"""
+        store_memory_via_llm(entity_id=request.sessionId, memory_text=memory_text)
         
         # Cleanup session cache after assessment is complete
         session_manager.delete_session(request.sessionId)

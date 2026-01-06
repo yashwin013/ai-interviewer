@@ -15,4 +15,4 @@ motor
 httpx
 uvicorn[standard]
 PyJWT
-
+memori
