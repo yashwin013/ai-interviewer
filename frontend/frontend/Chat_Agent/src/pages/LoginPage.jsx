@@ -147,7 +147,7 @@ const LoginPage = ({ onLogin }) => {
             </svg>
           </div>
           <h1 className="text-4xl font-extrabold text-white tracking-wide mb-2 bg-gradient-to-r from-purple-200 to-blue-200 bg-clip-text text-transparent">
-            AI INTERVIEW
+            U-VA Interview
           </h1>
           <h2 className="text-2xl font-semibold text-white/90 mb-1">Welcome Back</h2>
           <p className="text-white/60 text-sm">Log in to continue your journey</p>

@@ -24,8 +24,8 @@ const Header = ({ userEmail, onLogout }) => {
                             </div>
                         </div>
                         <h1 className="text-2xl font-bold tracking-wide">
-                            <span className="text-purple-400">Echo</span>
-                            <span className="text-white">Prep</span>
+                            <span className="text-purple-400">U-VA </span>
+                            <span className="text-white"> Interview</span>
                         </h1>
                     </Link>
 

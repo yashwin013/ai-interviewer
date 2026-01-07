@@ -12,6 +12,7 @@ import os
 import json
 import logging
 import time
+import random
 from dotenv import load_dotenv
 
 import sqlite3
@@ -453,21 +454,21 @@ EXTRACTION RULES:
 3. For LinkedIn: extract URL or just the username/profile path
 4. For skills: Try to extract all skills, but adhere to the limit of top 15 most relevant
 5. Determine seniority_level based on years of experience:
-   - 0-1 years experience: "Fresher"
-   - 1-3 years experience: "Junior"
-   - 3-7 years experience: "Mid-Senior"
-   - 7-12 years experience: "Senior"
-   - 12+ years experience: "Lead"
+    - 0-1 years experience: "Fresher"
+    - 1-3 years experience: "Junior"
+    - 3-7 years experience: "Mid-Senior"
+    - 7-12 years experience: "Senior"
+    - 12+ years experience: "Lead"
 
 Return a JSON object with EXACTLY these fields:
 {{
-  "candidate_first_name": "string or 'unknown'",
-  "candidate_last_name": "string or 'unknown'",
-  "candidate_email": "lowercase email or 'unknown'",
-  "candidate_linkedin": "LinkedIn URL/username or 'unknown'",
-  "experience": "brief summary of work experience (2-3 sentences)",
-  "skills": ["array", "of", "technical", "skills"],
-  "seniority_level": "one of: Fresher, Junior, Mid-Senior, Senior, Lead"
+    "candidate_first_name": "string or 'unknown'",
+    "candidate_last_name": "string or 'unknown'",
+    "candidate_email": "lowercase email or 'unknown'",
+    "candidate_linkedin": "LinkedIn URL/username or 'unknown'",
+    "experience": "brief summary of work experience (2-3 sentences)",
+    "skills": ["array", "of", "technical", "skills"],
+    "seniority_level": "one of: Fresher, Junior, Mid-Senior, Senior, Lead"
 }}
 
 Return ONLY valid JSON, no other text."""
@@ -552,19 +553,19 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     - Sound more like a realhuman, not like a robot
     - Use brief acknowledgments like "Great", "Interesting", "I see", "I understand", "Let's move ahead"
 
-    QUESTION DIFFICULTY (must match seniority):
+    QUESTION DIFFICULTY (STRICT):
     - Fresher: Basic concepts, simple scenarios, fundamentals
     - Junior: Practical application, common problems, hands-on tasks
     - Mid-level: System design, trade-offs, best practices, deeper reasoning
     - Senior: Architecture, leadership, complex decisions, end-to-end ownership
     
-    QUESTION VARIETY (balanced mix):
+    QUESTION VARIETY (MANDATORY):
     - 40% Technical skills based on resume
     - 30% Past experience and projects
     - 20% Problem-solving scenarios
     - 10% Behavioral and soft skills
     
-    CONVERSATION FLOW:
+    CONVERSATION FLOW RULES:
     - Acknowledge answers briefly when appropriate
     - If answer is excellent, give brief positive feedback
     - Keep the conversation flow natural, adhering to the speaking style and personality style provided to you.
@@ -577,21 +578,23 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     - Very short/vague answers (under 5 words)
     - Off-topic or unclear responses
     
-    For clarifying questions:
+    Rules for Clarifying Questions:
     - PREFIX your question with [CLARIFY] tag (e.g., "[CLARIFY] Could you give me a specific example?")
     - Ask at most 1 clarifying follow-up per original question
     - Keep clarifying questions short and encouraging
-    - Examples: "[CLARIFY] Let me rephrase that - can you share a specific example?"
-                "[CLARIFY] I'd love to hear more. What was your approach?"
-                "[CLARIFY] No worries! How about we try a simpler version - have you worked with...?"
+    - Some example templates which you can use are: "[CLARIFY] Let me rephrase that - can you share a specific example?"
+                                                    "[CLARIFY] I'd love to hear more. What was your approach?"
+                                                    "[CLARIFY] No worries! How about we try a simpler version - have you worked with...?"
+                                                    "[CLARIFY] I'd like to hear more about that. Can you elaborate?"
     
     CRITICAL RULES:
     - Strictly adhere to the question variety rules given to you. The interview must contain questions from all areas mentioned under "QUESTION VARIETY" section, with Technical and Experience-based questions making up the majority of the interview.
-    - First question (when total_questions_asked == 0) MUST be an introductory question:
-        * "Tell me about yourself and your background."
-        * "Walk me through your experience."
+    - First question (when total_questions_asked == 0) MUST be an introductory question. Some examples you can use are:
+        * "Hello. Before we start with the interview can you introduce yourself and walk me through your background?"
+        * "Walk me through your experience." 
         * "Give me a brief introduction about yourself."
-    - The second question you ask (when total_questions_asked == 1) should start with {candidate_first_name} (if available). Some examples can be used are: 
+        * "Let's start the interview with a brief introduction about yourself and your background."
+    - The second question you ask (when total_questions_asked == 1) should start with {candidate_first_name} (if available). Some examples, which can be used are: 
             *"Thanks, {candidate_first_name}. Can you elaborate on..."
             *"Great to meet you, {candidate_first_name}. Let's dive into..."
             *"Nice to hear that, {candidate_first_name}. Could you tell me more about..."
@@ -1107,9 +1110,9 @@ async def next_question(request: NextQuestionRequest):
         if conversation and len(conversation) > 0 and is_repeat_request(request.currentAnswer):
             last_qa = conversation[-1]
             repeat_q = last_qa.get("question") or ""
-            prefix = "Sure, I will repeat the question: "
+            prefix = ["Sure, I will repeat the question: ", "Sure, here is the question again: ", "No problem, my question was: "]
             print(f"[REPEAT] User requested repeat. Re-sending last question for session {request.sessionId}")
-            return NextQuestionResponse(nextQuestion=f"{prefix}{repeat_q}", isRepeat=True)
+            return NextQuestionResponse(nextQuestion=f"{random.choice(prefix)}{repeat_q}", isRepeat=True)
         
         # Normal flow: record the candidate's answer for the last question if missing
         if conversation and len(conversation) > 0:
@@ -1317,8 +1320,8 @@ async def next_question_stream(request: NextQuestionRequest):
         last_qa = conversation[-1]
         repeat_q = last_qa.get("question", "") or ""
         # Stream the repeat as small chunks for SSE clients, with a spoken prefix
-        prefix = "Sure, I will repeat the question: "
-        full_text = f"{prefix}{repeat_q}"
+        prefix = ["Sure, I will repeat the question: ", "Certainlly, here is the question again: ", "Sure thing, here is the question again: "]
+        full_text = f"{random.choice(prefix)}{repeat_q}"
         def repeat_generator():
             # Yield small chunks for better streaming behavior
             q = full_text

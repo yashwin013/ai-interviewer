@@ -130,7 +130,7 @@ const SignupPage = ({ onSignup }) => {
                         </svg>
                     </div>
                     <h1 className="text-4xl font-extrabold text-white tracking-wide mb-2 bg-gradient-to-r from-indigo-200 to-pink-200 bg-clip-text text-transparent">
-                        AI INTERVIEW
+                        U-VA Interview
                     </h1>
                     <h2 className="text-2xl font-semibold text-white/90 mb-1">Create Account</h2>
                     <p className="text-white/60 text-sm">Join us and start your journey</p>
