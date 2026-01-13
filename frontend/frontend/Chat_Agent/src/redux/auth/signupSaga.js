@@ -36,6 +36,7 @@ function* signupWorker(action) {
   try {
     const response = yield call(signupApi, action.payload);
     localStorage.setItem("token", response.data.token);
+    localStorage.setItem("user", JSON.stringify(response.data));
 
     yield put(signupSuccess(response.data));
   } catch (error) {

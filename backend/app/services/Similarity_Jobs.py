@@ -2,7 +2,7 @@ import json
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import Any
-       
+
 class Job_Matcher:
     
     def __init__(self, embeddings):

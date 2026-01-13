@@ -5,7 +5,7 @@ import { signupRequest } from "../redux/auth/signupSlice";
 
 const SignupPage = ({ onSignup }) => {
     const dispatch = useDispatch();
-    const { loading, success, error: apiError } = useSelector((state) => state.signup);
+    const { loading, success, user, error: apiError } = useSelector((state) => state.signup);
     const navigate = useNavigate();
     const [error, setError] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -40,10 +40,13 @@ const SignupPage = ({ onSignup }) => {
     };
 
     useEffect(() => {
-        if (success) {
-            navigate("/");
+        if (success && user) {
+            if (onSignup) {
+                onSignup(user);
+            }
+            navigate("/dashboard");
         }
-    }, [success, navigate]);
+    }, [success, user, navigate, onSignup]);
 
     useEffect(() => {
         if (apiError) {
@@ -52,19 +55,9 @@ const SignupPage = ({ onSignup }) => {
     }, [apiError]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 px-4 font-sans relative overflow-hidden">
-            {/* Enhanced Animated Background */}
+        <div className="min-h-screen flex items-center justify-center bg-[#0d0b1a] px-4 font-sans relative overflow-hidden">
+            {/* Styles for animations */}
             <style>{`
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px) translateX(0px); }
-                    33% { transform: translateY(-20px) translateX(10px); }
-                    66% { transform: translateY(-10px) translateX(-10px); }
-                }
-                @keyframes float-delayed {
-                    0%, 100% { transform: translateY(0px) translateX(0px); }
-                    33% { transform: translateY(-15px) translateX(-15px); }
-                    66% { transform: translateY(-25px) translateX(5px); }
-                }
                 @keyframes slide-up {
                     from { opacity: 0; transform: translateY(30px); }
                     to { opacity: 1; transform: translateY(0); }
@@ -78,8 +71,6 @@ const SignupPage = ({ onSignup }) => {
                     25% { transform: translateX(-10px); }
                     75% { transform: translateX(10px); }
                 }
-                .animate-float { animation: float 6s ease-in-out infinite; }
-                .animate-float-delayed { animation: float-delayed 8s ease-in-out infinite; }
                 .animate-slide-up { animation: slide-up 0.6s ease-out; }
                 .animate-scale-in { animation: scale-in 0.5s ease-out; }
                 .animate-shake { animation: shake 0.5s ease-in-out; }
@@ -88,7 +79,7 @@ const SignupPage = ({ onSignup }) => {
                 }
                 .input-focus:focus {
                     transform: translateY(-2px);
-                    box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+                    box-shadow: 0 10px 25px rgba(0, 217, 255, 0.2);
                 }
                 .btn-ripple {
                     position: relative;
@@ -112,19 +103,18 @@ const SignupPage = ({ onSignup }) => {
                 }
             `}</style>
 
-            {/* Floating Particles */}
+            {/* Static Background Accents */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-20 right-10 w-72 h-72 bg-indigo-500/20 rounded-full blur-3xl animate-float"></div>
-                <div className="absolute top-40 left-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float-delayed"></div>
-                <div className="absolute bottom-20 right-1/3 w-80 h-80 bg-pink-500/20 rounded-full blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
-                <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-float-delayed" style={{animationDelay: '4s'}}></div>
+                <div className="absolute top-20 right-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute top-40 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-20 right-1/3 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
             </div>
 
             {/* Glassmorphism Card */}
-            <div className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20 z-10 animate-scale-in">
+            <div className="w-full max-w-md bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-[rgba(0,217,255,0.15)] z-10 animate-scale-in">
                 {/* Header */}
                 <div className="text-center mb-8 animate-slide-up">
-                    <div className="inline-block p-4 bg-gradient-to-br from-indigo-500 to-pink-600 rounded-2xl mb-4 shadow-lg animate-float">
+                    <div className="inline-block p-4 bg-gradient-to-br from-purple-500 to-cyan-500 rounded-2xl mb-4 shadow-lg">
                         <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>

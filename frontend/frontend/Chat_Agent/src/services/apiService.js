@@ -132,6 +132,12 @@ export const getRecommendedJobs = async (userId) => {
   return response.data;
 };
 
+// Get all jobs with match percentages based on user's resume
+export const getMatchedJobs = async (userId, params = {}) => {
+  const response = await axiosInstance.get(`/jobs/matched/${userId}`, { params });
+  return response.data;
+};
+
 /**
  * Search jobs by keyword
  * @param {string} query - Search query

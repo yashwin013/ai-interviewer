@@ -532,11 +532,37 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     RECALLED MEMORIES (facts from earlier in this interview or previous sessions):
     {recalled_memories}
     
-    USE RECALLED MEMORIES TO:
-    - Reference specific things the candidate mentioned earlier
-    - Build on their stated skills, experiences, or preferences
-    - Create continuity by connecting new questions to previous answers
-    - Show active listening by acknowledging what they've shared
+    MEMORY INTELLIGENCE RULES (VERY IMPORTANT):
+
+    RESUME PRECEDENCE RULE (CRITICAL):
+    - Resume Context defines WHAT topics must be covered
+    - Recalled Memories define HOW deeply to explore a topic
+    - Never skip a resume-relevant topic solely due to memory
+
+    MEMORY PRIORITY:
+    - Treat recalled memories as accurate, high-confidence facts
+    - Use memories to deepen or continue resume-based topics
+    - Never invent facts not present in memory bank or resume
+
+    MEMORY → QUESTION STRATEGY:
+    - Skills mentioned → ask deeper usage or edge cases
+    - Experiences mentioned → ask decisions, trade-offs, outcomes
+    - Preferences mentioned → validate with examples
+    - Weaknesses mentioned → probe gently or pivot
+
+    MEMORY ACKNOWLEDGMENT:
+    - Reference memories subtly and naturally
+    - Use short phrases like "Earlier you mentioned..."
+    - Never mention memory systems or past sessions explicitly in the conversation
+
+    MEMORY ABSENCE:
+    - If no relevant memory exists, rely on resume context
+    - Ask exploratory resume-based questions to create new memory
+
+    MEMORY + CLARIFY:
+    - Clarify only if answer conflicts with memory
+    - Do not clarify answers that repeat known memory
+
     
     YOUR PERSONALITY:
     - Warm and encouraging, never intimidating
@@ -559,12 +585,18 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     - Mid-level: System design, trade-offs, best practices, deeper reasoning
     - Senior: Architecture, leadership, complex decisions, end-to-end ownership
     
-    QUESTION VARIETY (MANDATORY):
-    - 40% Technical skills based on resume
-    - 30% Past experience and projects
-    - 20% Problem-solving scenarios
-    - 10% Behavioral and soft skills
     
+    QUESTION PLANNING RULE (IMPORTANT):
+    - Decide the category of the next question BEFORE writing it
+    - Use this mapping based on {total_questions_asked}:
+    - Questions 1 to 2 → Experience / Background
+    - Questions 3 to 4 → Technical (resume-based)
+    - Questions 5 to 6 → Problem-solving
+    - Final question → Behavioral / reflection
+    - When the interview has MORE than 7 QUESTIONS, try to ask questions from technical, problem-solving areas only. The end question should always be behavioral/reflection. 
+    - If {max_questions} < 7, still include AT LEAST one question from each category
+
+
     CONVERSATION FLOW RULES:
     - Acknowledge answers briefly when appropriate
     - If answer is excellent, give brief positive feedback
@@ -589,11 +621,10 @@ interviewer_prompt = ChatPromptTemplate.from_messages([
     
     CRITICAL RULES:
     - Strictly adhere to the question variety rules given to you. The interview must contain questions from all areas mentioned under "QUESTION VARIETY" section, with Technical and Experience-based questions making up the majority of the interview.
-    - First question (when total_questions_asked == 0) MUST be an introductory question. Some examples you can use are:
-        * "Hello. Before we start with the interview can you introduce yourself and walk me through your background?"
-        * "Walk me through your experience." 
-        * "Give me a brief introduction about yourself."
-        * "Let's start the interview with a brief introduction about yourself and your background."
+    
+    
+            
+    
     - The second question you ask (when total_questions_asked == 1) should start with {candidate_first_name} (if available). Some examples, which can be used are: 
             *"Thanks, {candidate_first_name}. Can you elaborate on..."
             *"Great to meet you, {candidate_first_name}. Let's dive into..."
@@ -969,9 +1000,10 @@ async def init_interview(request: InitInterviewRequest):
             )
         
         # ===== INSTANT INTRO QUESTION =====
-        # This requires NO LLM call - returns immediately!
+        #This requires NO LLM call - returns immediately!
         intro_question = (
-            "Welcome! Before we begin with your interview, I'd like to get to know you a little better. "
+            "Welcome! Before we begin with the interview, I would like to recommend you to sit in a quiet place with no disturbances. Please ensure that your microphone and speakers are working properly. During the interview, please answer the questions to the best of your ability. If you need me to repeat or clarify any question, feel free to ask. Let's get started!"
+            "I'd like to get to know you a little better. "
             "Could you please introduce yourself and tell me what excites you most about your career?"
         )
         
@@ -1152,9 +1184,9 @@ Candidate's Answer: {request.currentAnswer[:1000]}
                 # Get candidate name for personalized closing
                 candidate_name = resume_profile.get('candidate_first_name', '')
                 if candidate_name and candidate_name.lower() != 'unknown':
-                    closing = f"Thank you so much, {candidate_name}! That concludes our interview. You did a great job, and I really enjoyed our conversation. We'll be in touch soon with your results. Best of luck!"
+                    closing = f"Thank you so much, {candidate_name}! That concludes our interview. You did a great job, and I really enjoyed our conversation. Best of luck!"
                 else:
-                    closing = "Thank you so much! That concludes our interview. You did a great job, and I really enjoyed our conversation. We'll be in touch soon with your results. Best of luck!"
+                    closing = "Thank you so much! That concludes our interview. You did a great job, and I really enjoyed our conversation.s Best of luck!"
                 
                 return NextQuestionResponse(
                     nextQuestion=None,

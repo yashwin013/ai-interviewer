@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from '../components/dashboard/Sidebar';
-import { getAllJobs, searchJobs } from '../services/apiService';
+import { getAllJobs, searchJobs, getMatchedJobs } from '../services/apiService';
 
 const JobBoard = ({ userEmail, onLogout }) => {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ const JobBoard = ({ userEmail, onLogout }) => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [hasMatchData, setHasMatchData] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -20,10 +21,31 @@ const JobBoard = ({ userEmail, onLogout }) => {
   const fetchJobs = async () => {
     try {
       setLoading(true);
+      
+      // Try to get matched jobs if user is logged in
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user?.userId) {
+            const response = await getMatchedJobs(user.userId, { page, limit: 20 });
+            setJobs(response.jobs);
+            setTotalPages(response.totalPages);
+            setTotal(response.total);
+            setHasMatchData(response.jobs.length > 0 && response.jobs[0].has_match_data);
+            return;
+          }
+        } catch (err) {
+          console.warn('Failed to get matched jobs, falling back to all jobs:', err);
+        }
+      }
+      
+      // Fallback to regular job listing
       const response = await getAllJobs({ page, limit: 20 });
       setJobs(response.jobs);
       setTotalPages(response.totalPages);
       setTotal(response.total);
+      setHasMatchData(false);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
     } finally {
@@ -116,9 +138,23 @@ const JobBoard = ({ userEmail, onLogout }) => {
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition mb-1">
-                              {job.title}
-                            </h3>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition">
+                                {job.title}
+                              </h3>
+                              {/* Match Percentage Badge */}
+                              {job.has_match_data && job.match_percentage !== null && (
+                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                  job.match_percentage >= 70 
+                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                                    : job.match_percentage >= 40 
+                                      ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                }`}>
+                                  {job.match_percentage}% Match
+                                </span>
+                              )}
+                            </div>
                             <p className="text-white/60 font-medium text-lg">{job.company}</p>
                           </div>
                           <svg className="w-6 h-6 text-white/30 group-hover:text-cyan-400 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,14 +188,33 @@ const JobBoard = ({ userEmail, onLogout }) => {
                               {job.experience_level}
                             </span>
                           )}
+                          {/* Matched Skills Count */}
+                          {job.has_match_data && job.matched_skills && job.matched_skills.length > 0 && (
+                            <span className="flex items-center gap-1 text-green-400">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              {job.matched_skills.length} skills matched
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {job.skills && job.skills.slice(0, 5).map((skill, idx) => (
-                            <span key={idx} className="px-3 py-1 bg-cyan-500/10 text-cyan-400 rounded-lg text-xs font-medium border border-cyan-500/20">
-                              {skill}
-                            </span>
-                          ))}
+                          {job.skills && job.skills.slice(0, 5).map((skill, idx) => {
+                            const isMatched = job.matched_skills && job.matched_skills.includes(skill.toLowerCase());
+                            return (
+                              <span 
+                                key={idx} 
+                                className={`px-3 py-1 rounded-lg text-xs font-medium border ${
+                                  isMatched 
+                                    ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                    : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                                }`}
+                              >
+                                {isMatched && '✓ '}{skill}
+                              </span>
+                            );
+                          })}
                           {job.skills && job.skills.length > 5 && (
                             <span className="px-3 py-1 bg-white/5 text-white/50 rounded-lg text-xs font-medium">
                               +{job.skills.length - 5} more

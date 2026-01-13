@@ -312,7 +312,7 @@ const ATSScore = ({ userEmail, onLogout }) => {
                   </div>
                 )}
 
-                {/* AI Tips Section */}
+                {/* AI Tips Section
                 <div className="bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl p-8 border border-[rgba(0,217,255,0.15)]">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -390,9 +390,9 @@ const ATSScore = ({ userEmail, onLogout }) => {
                       Click "Get AI Tips" for personalized, AI-generated improvement suggestions.
                     </p>
                   )}
-                </div>
+                </div> */}
 
-                {/* Action Buttons */}
+              {/*   Action Buttons */}
                 <div className="flex gap-4">
                   <button
                     onClick={() => navigate('/dashboard/resume')}

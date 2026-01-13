@@ -57,19 +57,9 @@ const LoginPage = ({ onLogin }) => {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 px-4 font-sans relative overflow-hidden">
-      {/* Enhanced Animated Background */}
+    <div className="min-h-screen flex items-center justify-center bg-[#0d0b1a] px-4 font-sans relative overflow-hidden">
+      {/* Styles for animations */}
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) translateX(0px); }
-          33% { transform: translateY(-20px) translateX(10px); }
-          66% { transform: translateY(-10px) translateX(-10px); }
-        }
-        @keyframes float-delayed {
-          0%, 100% { transform: translateY(0px) translateX(0px); }
-          33% { transform: translateY(-15px) translateX(-15px); }
-          66% { transform: translateY(-25px) translateX(5px); }
-        }
         @keyframes slide-up {
           from { opacity: 0; transform: translateY(30px); }
           to { opacity: 1; transform: translateY(0); }
@@ -78,34 +68,20 @@ const LoginPage = ({ onLogin }) => {
           from { opacity: 0; transform: scale(0.95); }
           to { opacity: 1; transform: scale(1); }
         }
-        @keyframes gradient-shift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-10px); }
           75% { transform: translateX(10px); }
         }
-        @keyframes ripple {
-          0% { transform: scale(0); opacity: 1; }
-          100% { transform: scale(4); opacity: 0; }
-        }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-float-delayed { animation: float-delayed 8s ease-in-out infinite; }
         .animate-slide-up { animation: slide-up 0.6s ease-out; }
         .animate-scale-in { animation: scale-in 0.5s ease-out; }
-        .animate-gradient { 
-          background-size: 200% 200%;
-          animation: gradient-shift 8s ease infinite;
-        }
         .animate-shake { animation: shake 0.5s ease-in-out; }
         .input-focus {
           transition: all 0.3s ease;
         }
         .input-focus:focus {
           transform: translateY(-2px);
-          box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+          box-shadow: 0 10px 25px rgba(0, 217, 255, 0.2);
         }
         .btn-ripple {
           position: relative;
@@ -128,20 +104,19 @@ const LoginPage = ({ onLogin }) => {
           height: 300px;
         }
       `}</style>
-
-      {/* Floating Particles */}
+      
+      {/* Static Background Accents */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-float-delayed"></div>
-        <div className="absolute bottom-20 left-1/3 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
-        <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl animate-float-delayed" style={{animationDelay: '4s'}}></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-40 right-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-1/3 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
       </div>
-
+      
       {/* Glassmorphism Card */}
-      <div className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20 z-10 animate-scale-in">
+      <div className="w-full max-w-md bg-[#1a1633]/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-[rgba(0,217,255,0.15)] z-10 animate-scale-in">
         {/* Header */}
         <div className="text-center mb-8 animate-slide-up">
-          <div className="inline-block p-4 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl mb-4 shadow-lg animate-float">
+          <div className="inline-block p-4 bg-gradient-to-br from-purple-500 to-cyan-500 rounded-2xl mb-4 shadow-lg">
             <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
@@ -152,7 +127,7 @@ const LoginPage = ({ onLogin }) => {
           <h2 className="text-2xl font-semibold text-white/90 mb-1">Welcome Back</h2>
           <p className="text-white/60 text-sm">Log in to continue your journey</p>
         </div>
-
+        
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email Input */}
@@ -209,7 +184,7 @@ const LoginPage = ({ onLogin }) => {
               </button>
             </div>
           </div>
-
+          
           {/* Error Message */}
           {error && (
             <div className="bg-red-500/20 backdrop-blur-sm text-red-200 text-sm px-4 py-3 rounded-xl flex items-center gap-2 border border-red-500/30 animate-shake">
@@ -238,7 +213,7 @@ const LoginPage = ({ onLogin }) => {
             ) : "Log In"}
           </button>
         </form>
-
+        
         {/* Footer */}
         <div className="text-center mt-6 animate-slide-up" style={{animationDelay: '0.4s'}}>
           <p className="text-white/70 text-sm">

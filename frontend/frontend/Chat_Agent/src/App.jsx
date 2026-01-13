@@ -189,7 +189,7 @@ function App() {
         <Route
           path="/SignupPage"
           element={
-              <SignupPage />
+              <SignupPage onSignup={handleLogin} />
           }
         />
       </Routes>
